@@ -338,7 +338,7 @@ public class CompressionFrame extends JFrame {
         String args="";
         String os = System.getProperty("os.name").toLowerCase();
         if(os.contains("windows"))
-            args="cmd start ";
+            args="cmd /C start ";
         args = "java -jar "+ StartFrame.OPENSTEGOPATH+" --embed --messagefile="+PATH_FILE+" --coverfile="+coverfile+" --stegofile="+stegofile;
 
         System.out.print(args);

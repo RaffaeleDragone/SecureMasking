@@ -236,8 +236,11 @@ public class DecompressionFrame extends JFrame {
         String extractdir= StartFrame.ROOTPATH+File.separator+"data"+File.separator+"file";
 
         //String args = path+" --embed --messagefile="+PATH_FILE+" --coverfile="+coverfile+" --stegofile="+stegofile;
-
-        String args = "/Library/Java/JavaVirtualMachines/jdk1.8.0_241.jdk/Contents/Home/bin/java -jar "+ StartFrame.OPENSTEGOPATH+" extract --stegofile="+stegofile+" --extractdir="+extractdir;
+        String args="";
+        String os = System.getProperty("os.name").toLowerCase();
+        if(os.contains("windows"))
+            args="cmd /C start ";
+        args = "/Library/Java/JavaVirtualMachines/jdk1.8.0_241.jdk/Contents/Home/bin/java -jar "+ StartFrame.OPENSTEGOPATH+" extract --stegofile="+stegofile+" --extractdir="+extractdir;
 
         System.out.print(args);
 
