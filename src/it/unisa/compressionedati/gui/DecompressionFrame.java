@@ -219,7 +219,7 @@ public class DecompressionFrame extends JFrame {
 
         showDialog(msgRtn + "\nDecompression done in " + df.format(seconds) + " seconds.");
         System.out.println("\n\nEnd decompression");
-        cleanDirectory(StartFrame.ROOTPATH+File.separator+"data"+File.separator+"file");
+        //cleanDirectory(StartFrame.ROOTPATH+File.separator+"data"+File.separator+"file");
 
     }
 

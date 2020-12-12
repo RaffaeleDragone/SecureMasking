@@ -4,6 +4,7 @@ package it.unisa.compressionedati.gui;
 import it.unisa.compressionedati.test.Test;
 import it.unisa.compressionedati.utils.UtilFiles;
 
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -31,12 +32,13 @@ public class StartFrame extends JFrame {
 
     public void createMainPanel(){
         JPanel panel = new JPanel();
-        panel.setLayout(new GridLayout(7, 1, 0, 14));
+        panel.setLayout(new GridLayout(8, 1, 0, 14));
 
         JPanel title = createTitlePanel();
         JPanel project = createProjectPanel();
         JPanel compression = createCompressionPanel();
         JPanel decompression = createDecompressionPanel();
+        JPanel videoMask = createVideoCompressPanel();
         JPanel test = createTestPanel();
         JPanel exit = createExitPanel();
         JPanel authors = createAuthorsPanel();
@@ -45,6 +47,7 @@ public class StartFrame extends JFrame {
         panel.add(project);
         panel.add(compression);
         panel.add(decompression);
+        panel.add(videoMask);
         panel.add(test);
         panel.add(exit);
         panel.add(authors);
@@ -140,6 +143,28 @@ public class StartFrame extends JFrame {
 
         class clickButton implements ActionListener{
             public void actionPerformed(ActionEvent e) {
+                StartFrame.this.dispose();
+            }
+        }
+
+        ActionListener listener = new clickButton();
+        btn.addActionListener(listener);
+
+        return panel;
+    }
+
+    public JPanel createVideoCompressPanel(){
+        JPanel panel = new JPanel();
+        JButton btn = new JButton("Video Mask");
+        //btn.setPreferredSize(new Dimension(150, 31));
+        panel.add(btn);
+
+        class clickButton implements ActionListener{
+            public void actionPerformed(ActionEvent e) {
+                VideoMaskFrame frame = new VideoMaskFrame();
+                frame.setLocationRelativeTo(null);
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setVisible(true);
                 StartFrame.this.dispose();
             }
         }

@@ -314,7 +314,7 @@ public class CompressionFrame extends JFrame {
 
         showDialog("Detected " + detections.toArray().length + " ROI.\n" + msgRtn + "\nCompression done in " + df.format(seconds) + " seconds.");
         System.out.println("\n\nEnd compression");
-        cleanDirectory(StartFrame.ROOTPATH+File.separator+"data"+File.separator+"file");
+        //cleanDirectory(StartFrame.ROOTPATH+File.separator+"data"+File.separator+"file");
 
 
     }
@@ -339,7 +339,7 @@ public class CompressionFrame extends JFrame {
         String os = System.getProperty("os.name").toLowerCase();
         if(os.contains("windows"))
             args="cmd /C start ";
-        args = "java -jar "+ StartFrame.OPENSTEGOPATH+" --embed --messagefile="+PATH_FILE+" --coverfile="+coverfile+" --stegofile="+stegofile;
+        args += "java -jar "+ StartFrame.OPENSTEGOPATH+" --embed --messagefile="+PATH_FILE+" --coverfile="+coverfile+" --stegofile="+stegofile;
 
         System.out.print(args);
 
