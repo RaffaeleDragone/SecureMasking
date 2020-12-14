@@ -1,5 +1,10 @@
 package it.unisa.compressionedati.utils;
 
+import it.unisa.compressionedati.gui.StartFrame;
+import org.bytedeco.javacpp.avcodec;
+import org.bytedeco.javacv.FFmpegFrameGrabber;
+import org.bytedeco.javacv.FFmpegFrameRecorder;
+import org.bytedeco.javacv.Frame;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -9,14 +14,14 @@ import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.VideoWriter;
 import org.opencv.videoio.Videoio;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.Base64;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
+import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
 
 
 public class UtilityMaskVideo {
@@ -30,8 +35,11 @@ public class UtilityMaskVideo {
     private FileWriter coordsRoiFile;
     private String maskPath;
     private final Semaphore semaforo;
+    private String video_in;
+    private String fileName;
 
-    public  UtilityMaskVideo(String _in_video, String _out_video, String mask, Semaphore semaphore, String classifierType) throws IOException {
+
+    public  UtilityMaskVideo(String _in_video, String _out_video, String mask, Semaphore semaphore, String classifierType,String fileName) throws IOException {
         this.faceCascade = new CascadeClassifier();
         if(classifierType.equalsIgnoreCase("Haar Classifier"))
             this.faceCascade.load("resources/haarcascades/haarcascade_frontalface_alt.xml");
@@ -46,15 +54,20 @@ public class UtilityMaskVideo {
         this.maskPath= mask;
         this.coordsRoiFile = new FileWriter(_out_video+"/dataFrame.txt");
         this.semaforo=semaphore;
+        this.video_in=_in_video;
+      this.fileName= fileName;
 
     }
 
 
     public void startMasking()
     {
+
+
         Size frameSize = new Size((int) this.capture.get(Videoio.CAP_PROP_FRAME_WIDTH), (int) this.capture.get(Videoio.CAP_PROP_FRAME_HEIGHT));
         int fps = (int) this.capture.get(Videoio.CAP_PROP_FPS);
-        this.writer.open(outfile+File.separator+"test.avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
+
+        this.writer.open(outfile+File.separator+fileName+".avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
 
 
         // grab a frame every 33 ms (30 frames/sec)
@@ -98,7 +111,7 @@ public class UtilityMaskVideo {
                     this.detectAndDisplayAndMask(frame);
 
                 }else{
-
+                    this.extractAudioTrack(video_in,outfile+File.separator+fileName+"_trackAudio.mp3");
                     stopAcquisition();
                     //System.exit(0);
                     System.out.println("FINE");
@@ -184,6 +197,52 @@ public class UtilityMaskVideo {
 
     }
 
+    private void extractAudioTrack(String _input, String _output){
+
+        String videoPath = _input;
+        //audio path
+        String extractAudio=_output;
+        try{
+            //check the audio file exist or not ,remove it if exist
+            File extractAudioFile = new File(extractAudio);
+            if (extractAudioFile.exists()) {
+                extractAudioFile.delete();
+            }
+            //audio recorder，extractAudio:audio path，2:channels
+            FFmpegFrameRecorder recorder = new FFmpegFrameRecorder(extractAudio, 2);
+            recorder.setAudioOption("crf", "0");
+            recorder.setAudioQuality(0);
+            //bit rate
+            recorder.setAudioBitrate(192000);
+            //sample rate
+            recorder.setSampleRate(44100);
+            recorder.setAudioChannels(2);
+            //encoder
+            recorder.setAudioCodec(avcodec.AV_CODEC_ID_MP3);
+            //start
+            recorder.start();
+            //load video
+            FFmpegFrameGrabber grabber = FFmpegFrameGrabber.createDefault(videoPath);
+
+            grabber.start();
+            Frame f=null;
+            //get audio sample and record it
+            while ((f = grabber.grabSamples()) != null) {
+                recorder.record(f);
+            }
+            // stop to save
+            grabber.stop();
+            recorder.release();
+            //output audio path
+            LOGGER.info(extractAudio);
+        } catch (Exception e) {
+            //LOGGER.err("", e);
+        }
+
+
+    }
+
+
     private void checkboxSelection(String classifierPath)
     {
         // load the classifier(s)
@@ -199,11 +258,17 @@ public class UtilityMaskVideo {
             try
             {
                 // stop the timer
+
                 this.timer.shutdown();
                 this.timer.awaitTermination(33, TimeUnit.MILLISECONDS);
                 this.writer.release();
                 this.coordsRoiFile.close();
                 this.capture.release();
+                this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
+                File intermedieVideo = new File(outfile+File.separator+fileName+".avi");
+                File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
+                intermedieVideo.delete();
+                audioTrack.delete();
             }
             catch (InterruptedException | IOException e)
             {
@@ -217,6 +282,43 @@ public class UtilityMaskVideo {
             // release the camera
             this.capture.release();
         }
+    }
+
+
+    public boolean execJavaScript( String audio_input, String video_input, String video_out) throws IOException, InterruptedException
+    {
+
+        String args="";
+        String os = System.getProperty("os.name").toLowerCase();
+        if(os.contains("windows"))
+            args="cmd /C start ";
+        args = "ffmpeg -i "+video_input+" -i "+audio_input+" -c:v copy -c:a aac "+video_out;
+
+        System.out.print(args);
+        String dir =System.getProperty("user.dir")+"/resources/ffmpeg/";
+        Process p = Runtime.getRuntime().exec(args,null, new File(dir));
+
+        BufferedReader stdInput = new BufferedReader(new
+                InputStreamReader(p.getInputStream()));
+
+        BufferedReader stdError = new BufferedReader(new
+                InputStreamReader(p.getErrorStream()));
+
+// Read the output from the command
+        System.out.println("Here is the standard output of the command:\n");
+        String s = null;
+        while ((s = stdInput.readLine()) != null) {
+            System.out.println(s);
+        }
+
+// Read any errors from the attempted command
+        System.out.println("Here is the standard error of the command (if any):\n");
+        while ((s = stdError.readLine()) != null) {
+            System.out.println(s);
+        }
+
+        return true;
+
     }
     protected void setClosed() throws IOException {
         this.writer.release();

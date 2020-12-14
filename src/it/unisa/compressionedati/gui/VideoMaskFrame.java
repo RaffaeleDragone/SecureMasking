@@ -88,9 +88,11 @@ public class VideoMaskFrame extends JFrame {
                 String mask = PATH_DATA + File.separator+"video"+File.separator+"mask"+File.separator+cmbMask.getSelectedItem().toString();
                 String PATH_OUT = PATH_DATA+File.separator+"video"+File.separator+"out";
                 String classifierType= cmbClassifier.getSelectedItem().toString();
+                String fileName= (combo.getSelectedItem().toString()).replace(".mp4","");
+
                 try {
                     semaforo.acquire();
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType, fileName);
                     videoMask.startMasking();
                 } catch (IOException | InterruptedException ioException) {
                     ioException.printStackTrace();
@@ -257,7 +259,7 @@ public class VideoMaskFrame extends JFrame {
         cleanDirectory(PATH_DATA + File.separator+"imgs"+File.separator+"out"+File.separator+"processed");
         cleanDirectory(PATH_DATA + File.separator+"imgs"+File.separator+"out"+File.separator+"roi");
         cleanDirectory(PATH_DATA + File.separator+"imgs"+File.separator+"out"+File.separator+"secure");
-        //cleanDirectory("/Users/raffaeledragone/Sviluppo/UnisaWs/CompressioneDati/secure-jpeg-masking/data/file");
+
 
 
 
