@@ -25,9 +25,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
+//import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
 
 
 public class UtilityMaskVideo {
@@ -67,13 +68,16 @@ public class UtilityMaskVideo {
       this.fileName= fileName;
     }
 
-    public  UtilityMaskVideo(String _in_video, String _out_video, String pathDataFrame, Semaphore semaphore) throws IOException {
+    public  UtilityMaskVideo(String _in_video, String _out_video, String pathDataFrame, Semaphore semaphore, String fileName) throws IOException {
         this.capture = new VideoCapture(_in_video);
         this.writer= new VideoWriter();
         this.outfile = _out_video;
+        this.unzipFile(pathDataFrame+"/dataFrame.zip",pathDataFrame+"/dataFrame.txt");
         dataFrameIn = new File(pathDataFrame+"/dataFrame.txt");
         in = new Scanner(dataFrameIn);
         this.semaforo=semaphore;
+        this.video_in=_in_video;
+        this.fileName= fileName;
     }
 
 
@@ -112,7 +116,7 @@ public class UtilityMaskVideo {
     {
         Size frameSize = new Size((int) this.capture.get(Videoio.CAP_PROP_FRAME_WIDTH), (int) this.capture.get(Videoio.CAP_PROP_FRAME_HEIGHT));
         int fps = (int) this.capture.get(Videoio.CAP_PROP_FPS);
-        this.writer.open(outfile+File.separator+"decompressed.avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
+        this.writer.open(outfile+File.separator+fileName+"_decompressed.avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
 
 
         // grab a frame every 33 ms (30 frames/sec)
@@ -161,7 +165,7 @@ public class UtilityMaskVideo {
                         this.detectAndDisplayAndUnmask(frame);
                 }else{
                     this.extractAudioTrack(video_in,outfile+File.separator+fileName+"_trackAudio.mp3");
-                    stopAcquisition();
+                    stopAcquisition(isMasking);
                     //System.exit(0);
                     System.out.println("FINE");
                     semaforo.release();
@@ -219,9 +223,8 @@ public class UtilityMaskVideo {
             // usiamo il carattere '-' per dividere le informazioni di ogni ROI
             coords += i + "," + rect.x + "," + rect.y + "-";
             out+= "coord= "+coords+" ";
-            Imgcodecs.imwrite("/Users/raffaeledragone/Sviluppo/UnisaWs/CompressioneDati/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
-
-
+            //Imgcodecs.imwrite("/Users/raffaeledragone/Sviluppo/UnisaWs/CompressioneDati/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
+            Imgcodecs.imwrite("/home/dangerous/Scrivania/CD/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
 
             MatOfByte mob=new MatOfByte();
             Imgcodecs.imencode(".jpg", matrixImgROI, mob);
@@ -286,7 +289,7 @@ public class UtilityMaskVideo {
             grabber.stop();
             recorder.release();
             //output audio path
-            LOGGER.info(extractAudio);
+            //LOGGER.info(extractAudio);
         } catch (Exception e) {
             //LOGGER.err("", e);
         }
@@ -343,7 +346,7 @@ public class UtilityMaskVideo {
         // now the video capture can start
         //this.cameraButton.setDisable(false);
     }
-    private void stopAcquisition()
+    private void stopAcquisition(boolean isMasking)
     {
         if (this.timer!=null && !this.timer.isShutdown())
         {
@@ -360,11 +363,20 @@ public class UtilityMaskVideo {
                     this.coordsRoiFile.close();
                 this.zipFile(this.outfile+"/dataFrame.txt",this.outfile+"/dataFrame.zip");
                 this.capture.release();
-                this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
-                File intermedieVideo = new File(outfile+File.separator+fileName+".avi");
-                File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
-                intermedieVideo.delete();
-                audioTrack.delete();
+                if(isMasking){
+                    this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
+                    File intermedieVideo = new File(outfile+File.separator+fileName+".avi");
+                    File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
+                    intermedieVideo.delete();
+                    audioTrack.delete();
+                }
+                else{
+                    this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",outfile+File.separator+fileName+"_decompressed.mp4");
+                    File intermedieVideo = new File(outfile+File.separator+fileName+"_decompressed.avi");
+                    File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
+                    intermedieVideo.delete();
+                    audioTrack.delete();
+                }
             }
             catch (InterruptedException | IOException e)
             {
@@ -380,6 +392,27 @@ public class UtilityMaskVideo {
             // release the camera
             this.capture.release();
         }
+    }
+
+    private void unzipFile(String source, String target) throws IOException {
+        String fileZip = source;
+        File destDir = new File(target);
+        byte[] buffer = new byte[1024];
+        ZipInputStream zis = new ZipInputStream(new FileInputStream(fileZip));
+        ZipEntry zipEntry = zis.getNextEntry();
+        while (zipEntry != null) {
+            File newFile = new File(target);
+            // write file content
+            FileOutputStream fos = new FileOutputStream(newFile);
+            int len;
+            while ((len = zis.read(buffer)) > 0) {
+                fos.write(buffer, 0, len);
+            }
+            fos.close();
+            zipEntry = zis.getNextEntry();
+        }
+        zis.closeEntry();
+        zis.close();
     }
 
     private void zipFile(String source, String target) throws IOException {
@@ -421,14 +454,14 @@ public class UtilityMaskVideo {
         BufferedReader stdError = new BufferedReader(new
                 InputStreamReader(p.getErrorStream()));
 
-// Read the output from the command
+        // Read the output from the command
         System.out.println("Here is the standard output of the command:\n");
         String s = null;
         while ((s = stdInput.readLine()) != null) {
             System.out.println(s);
         }
 
-// Read any errors from the attempted command
+        // Read any errors from the attempted command
         System.out.println("Here is the standard error of the command (if any):\n");
         while ((s = stdError.readLine()) != null) {
             System.out.println(s);
@@ -437,12 +470,11 @@ public class UtilityMaskVideo {
         return true;
 
     }
-    protected void setClosed() throws IOException {
+
+    /*protected void setClosed() throws IOException {
         this.writer.release();
         this.coordsRoiFile.close();
         this.capture.release();
         this.stopAcquisition();
-    }
-
-
+    }*/
 }

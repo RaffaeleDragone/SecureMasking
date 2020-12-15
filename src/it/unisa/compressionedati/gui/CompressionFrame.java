@@ -371,7 +371,8 @@ public class CompressionFrame extends JFrame {
 
 
     public String execPythonScript(String script, String file, String coords, String passw, String mode) throws IOException {
-        String[] args = new String[] { "/Users/raffaeledragone/opt/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
+        //String[] args = new String[] { "/Users/raffaeledragone/opt/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
+        String[] args = new String[] { "/home/dangerous/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
         Process process = new ProcessBuilder(args).start();
 
         //System.out.println(script+"\n"+file+"\n"+coords+"\n"+passw);

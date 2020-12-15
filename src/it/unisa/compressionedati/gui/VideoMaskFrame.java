@@ -137,9 +137,10 @@ public class VideoMaskFrame extends JFrame {
                 String video = PATH_DATA +File.separator+ "video"+File.separator+"out"+File.separator + combo.getSelectedItem().toString();
                 String path_dataFrame = PATH_DATA +File.separator+ "video"+File.separator+"out";
                 String PATH_OUT = PATH_DATA+File.separator+"video"+File.separator+"out";
+                String fileName= (combo.getSelectedItem().toString()).replace(".mp4","");
                 try {
                     semaforo.acquire();
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo, fileName);
                     videoMask.startUnmasking();
                 } catch (IOException | InterruptedException ioException) {
                     ioException.printStackTrace();
@@ -196,7 +197,6 @@ public class VideoMaskFrame extends JFrame {
             for (int i = 0; i < files.length; i++) {
                 if (files[i].isFile()) {
                     if(files[i] != null) {
-                        //if(files[i].getName().equals("test.avi") && mode.equals("decompress"))
                         if(mode.equals("decompress"))
                             classifiers.add(files[i].getName());
                         else if(mode.equals("compress"))
@@ -442,7 +442,8 @@ public class VideoMaskFrame extends JFrame {
 
 
     public String execPythonScript(String script, String file, String coords, String passw, String mode) throws IOException {
-        String[] args = new String[] { "/Users/raffaeledragone/opt/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
+        //String[] args = new String[] { "/Users/raffaeledragone/opt/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
+        String[] args = new String[] { "/home/dangerous/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
         Process process = new ProcessBuilder(args).start();
 
         //System.out.println(script+"\n"+file+"\n"+coords+"\n"+passw);

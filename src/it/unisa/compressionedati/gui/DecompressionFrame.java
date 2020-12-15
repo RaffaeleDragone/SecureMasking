@@ -252,7 +252,8 @@ public class DecompressionFrame extends JFrame {
 
 
     public String execPythonScript(String script, String file, String cipher, String mode, String passw) throws IOException {
-        String[] args = new String[] { "/Users/raffaeledragone/opt/anaconda3/envs/new/bin/python", script, file, cipher, mode, passw, StartFrame.ROOTPATH };
+        //String[] args = new String[] { "/Users/raffaeledragone/opt/anaconda3/envs/new/bin/python", script, file, cipher, mode, passw, StartFrame.ROOTPATH };
+        String[] args = new String[] { "/home/dangerous/anaconda3/envs/new/bin/python", script, file, cipher, mode, passw, StartFrame.ROOTPATH };
 
         //System.out.println(script+"\n"+file+"\n"+cipher+"\n"+mode+"\n"+passw);
 
