@@ -1,6 +1,7 @@
 package it.unisa.compressionedati.utils;
 
 import it.unisa.compressionedati.gui.StartFrame;
+import org.apache.commons.io.FileUtils;
 import org.bytedeco.javacpp.avcodec;
 import org.bytedeco.javacv.FFmpegFrameGrabber;
 import org.bytedeco.javacv.FFmpegFrameRecorder;
@@ -23,6 +24,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
 
@@ -45,6 +48,7 @@ public class UtilityMaskVideo {
 
 
     public  UtilityMaskVideo(String _in_video, String _out_video, String mask, Semaphore semaphore, String classifierType,String fileName) throws IOException {
+        FileUtils.cleanDirectory(new File(_out_video));
         this.faceCascade = new CascadeClassifier();
         if(classifierType.equalsIgnoreCase("Haar Classifier"))
             this.faceCascade.load("resources/haarcascades/haarcascade_frontalface_alt.xml");
@@ -348,6 +352,7 @@ public class UtilityMaskVideo {
                     this.in.close();
                 if(coordsRoiFile != null)
                     this.coordsRoiFile.close();
+                this.zipFile(this.outfile+"/dataFrame.txt",this.outfile+"/dataFrame.zip");
                 this.capture.release();
                 this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
                 File intermedieVideo = new File(outfile+File.separator+fileName+".avi");
@@ -362,11 +367,32 @@ public class UtilityMaskVideo {
             }
         }
 
+
+
         if (this.capture.isOpened())
         {
             // release the camera
             this.capture.release();
         }
+    }
+
+    private void zipFile(String source, String target) throws IOException {
+        String sourceFile = source;
+        FileOutputStream fos = new FileOutputStream(target);
+        ZipOutputStream zipOut = new ZipOutputStream(fos);
+        File fileToZip = new File(sourceFile);
+        FileInputStream fis = new FileInputStream(fileToZip);
+        ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
+        zipOut.putNextEntry(zipEntry);
+        byte[] bytes = new byte[1024];
+        int length;
+        while((length = fis.read(bytes)) >= 0) {
+            zipOut.write(bytes, 0, length);
+        }
+        zipOut.close();
+        fis.close();
+        fos.close();
+
     }
 
 
