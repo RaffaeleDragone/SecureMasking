@@ -220,10 +220,16 @@ public class UtilityMaskVideo {
             coords += i + "," + rect.x + "," + rect.y + "-";
             out+= "coord= "+coords+" ";
             Imgcodecs.imwrite("/Users/raffaeledragone/Sviluppo/UnisaWs/CompressioneDati/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
+
+
+
             MatOfByte mob=new MatOfByte();
             Imgcodecs.imencode(".jpg", matrixImgROI, mob);
             byte ba[]=mob.toArray();
-            String value = Base64.getEncoder().encodeToString(ba);
+            byte[] ba2 = UtilCompression.compressImageInJpeg(ba, 0.50f);
+            String value = Base64.getEncoder().encodeToString(ba2);
+
+            //String value = Base64.getEncoder().encodeToString(ba);
             out+="value= "+value+" ";
             File f=new File(mask);
             Mat matrixMask = Imgcodecs.imread(mask);
