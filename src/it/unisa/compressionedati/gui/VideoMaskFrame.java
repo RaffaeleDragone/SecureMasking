@@ -196,7 +196,8 @@ public class VideoMaskFrame extends JFrame {
             for (int i = 0; i < files.length; i++) {
                 if (files[i].isFile()) {
                     if(files[i] != null) {
-                        if(files[i].getName().equals("test.avi") && mode.equals("decompress"))
+                        //if(files[i].getName().equals("test.avi") && mode.equals("decompress"))
+                        if(mode.equals("decompress"))
                             classifiers.add(files[i].getName());
                         else if(mode.equals("compress"))
                             classifiers.add(files[i].getName());
@@ -441,7 +442,7 @@ public class VideoMaskFrame extends JFrame {
 
 
     public String execPythonScript(String script, String file, String coords, String passw, String mode) throws IOException {
-        String[] args = new String[] { "/home/dangerous/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
+        String[] args = new String[] { "/Users/raffaeledragone/opt/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
         Process process = new ProcessBuilder(args).start();
 
         //System.out.println(script+"\n"+file+"\n"+coords+"\n"+passw);

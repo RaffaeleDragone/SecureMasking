@@ -219,7 +219,7 @@ public class UtilityMaskVideo {
             // usiamo il carattere '-' per dividere le informazioni di ogni ROI
             coords += i + "," + rect.x + "," + rect.y + "-";
             out+= "coord= "+coords+" ";
-            Imgcodecs.imwrite("/home/dangerous/Scrivania/CD/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
+            Imgcodecs.imwrite("/Users/raffaeledragone/Sviluppo/UnisaWs/CompressioneDati/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
             MatOfByte mob=new MatOfByte();
             Imgcodecs.imencode(".jpg", matrixImgROI, mob);
             byte ba[]=mob.toArray();
