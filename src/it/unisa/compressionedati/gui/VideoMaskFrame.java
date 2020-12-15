@@ -26,7 +26,7 @@ public class VideoMaskFrame extends JFrame {
 
     private final int FRAME_WIDTH = 400;
     private final Semaphore semaforo;
-    private final int FRAME_HEIGHT = 350;
+    private final int FRAME_HEIGHT = 550;
     private final String PATH_DATA = StartFrame.ROOTPATH+File.separator+"data";
     private final String PATH_SCRIPT = StartFrame.ROOTPATH+File.separator+"script"+File.separator+"compression";
     private final String PATH_FILE= StartFrame.ROOTPATH+File.separator+"data"+File.separator+"file"+File.separator+"secret.txt";
@@ -47,20 +47,25 @@ public class VideoMaskFrame extends JFrame {
         //panel.setLayout(new GridLayout(1, 1, 0, 14));
         panel.setLayout(new BorderLayout());
         panel.setBorder(new EmptyBorder(5, 5, 5, 5));
-        JPanel options = createOptionsPanel();
+        JPanel innerPanel = new JPanel();
+        innerPanel.setLayout(new GridLayout(2,1));
+        JPanel compression = createCompressionPanel();
+        JPanel decompression = createDecompressionPanel();
         JPanel indietro = createIndietroPanel();
 
-        panel.add(options);
+        panel.add(innerPanel);
+        innerPanel.add(compression);
+        innerPanel.add(decompression);
         panel.add(indietro, BorderLayout.SOUTH);
 
         add(panel);
     }
 
-    public JPanel createOptionsPanel(){
+    public JPanel createCompressionPanel(){
         JPanel panel = new JPanel();
         panel.setLayout(new GridLayout(6, 1, 0, 5));
 
-        ArrayList<String> strs = populateComboFileName();
+        ArrayList<String> strs = populateComboFileName("compress");
         // Sort dell'arraylist
         strs.sort(String::compareToIgnoreCase);
         JComboBox combo = new JComboBox(strs.toArray());
@@ -73,9 +78,6 @@ public class VideoMaskFrame extends JFrame {
         classifier.add("Haar Classifier");
         classifier.add("LBP Classifier");
         JComboBox cmbClassifier = new JComboBox(classifier.toArray());
-
-
-
 
         TextField text = new TextField();
         text.setText("password");
@@ -111,7 +113,48 @@ public class VideoMaskFrame extends JFrame {
         panel.add(cmbClassifier);
         panel.add(text);
         panel.add(btn);
-        panel.setBorder(new TitledBorder(new EtchedBorder(), "Options"));
+        panel.setBorder(new TitledBorder(new EtchedBorder(), "Compression"));
+
+        return panel;
+    }
+
+    public JPanel createDecompressionPanel(){
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout(4, 1, 0, 5));
+
+        ArrayList<String> strs = populateComboFileName("decompress");
+        // Sort dell'arraylist
+        strs.sort(String::compareToIgnoreCase);
+        JComboBox combo = new JComboBox(strs.toArray());
+
+        TextField text = new TextField();
+        text.setText("password");
+        text.setBackground(Color.WHITE);
+        JButton btn = new JButton("Decompress");
+
+        class clickButton implements ActionListener {
+            public void actionPerformed(ActionEvent e) {
+                String video = PATH_DATA +File.separator+ "video"+File.separator+"out"+File.separator + combo.getSelectedItem().toString();
+                String path_dataFrame = PATH_DATA +File.separator+ "video"+File.separator+"out";
+                String PATH_OUT = PATH_DATA+File.separator+"video"+File.separator+"out";
+                try {
+                    semaforo.acquire();
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo);
+                    videoMask.startUnmasking();
+                } catch (IOException | InterruptedException ioException) {
+                    ioException.printStackTrace();
+                }
+            }
+        }
+
+        ActionListener listener = new clickButton();
+        btn.addActionListener(listener);
+
+        panel.add(new JLabel("Video Input"));
+        panel.add(combo);
+        panel.add(text);
+        panel.add(btn);
+        panel.setBorder(new TitledBorder(new EtchedBorder(), "Decompression"));
 
         return panel;
     }
@@ -139,8 +182,13 @@ public class VideoMaskFrame extends JFrame {
         return panel;
     }
 
-    public ArrayList<String> populateComboFileName() {
-        File folder = new File(PATH_DATA + File.separator+"video"+File.separator+"in");
+    public ArrayList<String> populateComboFileName(String mode) {
+        File folder = null;
+        if(mode.equals("compress"))
+            folder = new File(PATH_DATA + File.separator+"video"+File.separator+"in");
+        if(mode.equals("decompress"))
+            folder = new File(PATH_DATA + File.separator+"video"+File.separator+"out");
+
         File[] files = folder.listFiles();
         ArrayList<String> classifiers = new ArrayList<>();
 
@@ -148,7 +196,10 @@ public class VideoMaskFrame extends JFrame {
             for (int i = 0; i < files.length; i++) {
                 if (files[i].isFile()) {
                     if(files[i] != null) {
-                        classifiers.add(files[i].getName());
+                        if(files[i].getName().equals("test.avi") && mode.equals("decompress"))
+                            classifiers.add(files[i].getName());
+                        else if(mode.equals("compress"))
+                            classifiers.add(files[i].getName());
                     }
                 }
             }
@@ -390,7 +441,7 @@ public class VideoMaskFrame extends JFrame {
 
 
     public String execPythonScript(String script, String file, String coords, String passw, String mode) throws IOException {
-        String[] args = new String[] { "/home/alfonso/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
+        String[] args = new String[] { "/home/dangerous/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
         Process process = new ProcessBuilder(args).start();
 
         //System.out.println(script+"\n"+file+"\n"+coords+"\n"+passw);

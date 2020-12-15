@@ -371,7 +371,7 @@ public class CompressionFrame extends JFrame {
 
 
     public String execPythonScript(String script, String file, String coords, String passw, String mode) throws IOException {
-        String[] args = new String[] { "/home/alfonso/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
+        String[] args = new String[] { "/home/dangerous/anaconda3/envs/new/bin/python", script, file, coords, passw, mode , StartFrame.ROOTPATH };
         Process process = new ProcessBuilder(args).start();
 
         //System.out.println(script+"\n"+file+"\n"+coords+"\n"+passw);
@@ -384,6 +384,7 @@ public class CompressionFrame extends JFrame {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}*/
+
         String s=decodeReturn(in.readLine());
         //System.out.println(s);
         return s;

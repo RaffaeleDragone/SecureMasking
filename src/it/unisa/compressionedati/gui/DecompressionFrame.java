@@ -240,7 +240,7 @@ public class DecompressionFrame extends JFrame {
         String os = System.getProperty("os.name").toLowerCase();
         if(os.contains("windows"))
             args="cmd /C start ";
-        args = "/Library/Java/JavaVirtualMachines/jdk1.8.0_241.jdk/Contents/Home/bin/java -jar "+ StartFrame.OPENSTEGOPATH+" extract --stegofile="+stegofile+" --extractdir="+extractdir;
+        args = "/usr/lib/jvm/java-11-openjdk-amd64/bin/java -jar "+ StartFrame.OPENSTEGOPATH+" extract --stegofile="+stegofile+" --extractdir="+extractdir;
 
         System.out.print(args);
 
@@ -252,7 +252,7 @@ public class DecompressionFrame extends JFrame {
 
 
     public String execPythonScript(String script, String file, String cipher, String mode, String passw) throws IOException {
-        String[] args = new String[] { "/home/alfonso/anaconda3/envs/new/bin/python", script, file, cipher, mode, passw, StartFrame.ROOTPATH };
+        String[] args = new String[] { "/home/dangerous/anaconda3/envs/new/bin/python", script, file, cipher, mode, passw, StartFrame.ROOTPATH };
 
         //System.out.println(script+"\n"+file+"\n"+cipher+"\n"+mode+"\n"+passw);
 

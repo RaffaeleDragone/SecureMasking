@@ -14,8 +14,8 @@ import java.util.Properties;
 
 public class StartFrame extends JFrame {
 
-    private final int FRAME_WIDTH = 240;
-    private final int FRAME_HEIGHT = 320;
+    private final int FRAME_WIDTH = 280;
+    private final int FRAME_HEIGHT = 370;
     public static final String ROOTPATH= new File("").getAbsolutePath();
     public static String OPENSTEGOPATH=null;
     public StartFrame(){
