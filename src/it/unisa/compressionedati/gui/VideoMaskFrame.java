@@ -6,11 +6,13 @@ import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.video.Video;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -75,8 +77,8 @@ public class VideoMaskFrame extends JFrame {
         JComboBox cmbMask = new JComboBox(mask.toArray());
 
         ArrayList<String> classifier = new ArrayList<>();
-        classifier.add("Haar Classifier");
-        classifier.add("LBP Classifier");
+        classifier.add("Haar Frontal Face");
+        classifier.add("Haar Eye");
         JComboBox cmbClassifier = new JComboBox(classifier.toArray());
 
         TextField text = new TextField();
@@ -94,8 +96,21 @@ public class VideoMaskFrame extends JFrame {
 
                 try {
                     semaforo.acquire();
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType, fileName);
+                    JFrame waitingPanel = new JFrame();
+                    waitingPanel.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                    waitingPanel.setSize(500,250);
+                    waitingPanel.setLocation(btn.getX(),btn.getY());
+                    //waitingPanel.setUndecorated(true);
+                    JTextArea console = new JTextArea();
+                    JScrollPane scr = new JScrollPane(console,
+                            JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
+                            JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+                    console.setSize(470,240);
+                    console.setEditable(false);
+                    waitingPanel.add(scr);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType, fileName,waitingPanel,VideoMaskFrame.this,console);
                     videoMask.startMasking();
+
                 } catch (IOException | InterruptedException ioException) {
                     ioException.printStackTrace();
                 }
@@ -140,7 +155,12 @@ public class VideoMaskFrame extends JFrame {
                 String fileName= (combo.getSelectedItem().toString()).replace(".mp4","");
                 try {
                     semaforo.acquire();
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo, fileName);
+                    JFrame waitingPanel = new JFrame();
+                    waitingPanel.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                    waitingPanel.setSize(500,250);
+                    waitingPanel.setLocation(btn.getX(),btn.getY());
+                    waitingPanel.getRootPane().setWindowDecorationStyle(JRootPane.NONE);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo, fileName,waitingPanel, VideoMaskFrame.this);
                     videoMask.startUnmasking();
                 } catch (IOException | InterruptedException ioException) {
                     ioException.printStackTrace();

@@ -15,6 +15,8 @@ import org.opencv.videoio.VideoCapture;
 import org.opencv.videoio.VideoWriter;
 import org.opencv.videoio.Videoio;
 
+import javax.swing.*;
+import java.awt.event.WindowEvent;
 import java.io.*;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -36,7 +38,9 @@ public class UtilityMaskVideo {
     private VideoCapture capture;
     private boolean cameraActive;
     private CascadeClassifier faceCascade;
+    private CascadeClassifier eyeClassifier;
     private int absoluteFaceSize;
+    private int absoluteEyeSize;
     private VideoWriter writer;
     private String outfile;
     private FileWriter coordsRoiFile;
@@ -45,33 +49,48 @@ public class UtilityMaskVideo {
     private String maskPath;
     private final Semaphore semaforo;
     private String video_in;
+    private String classifierType;
     private String fileName;
+    private JFrame waitingPanel,parentPanel;
+    private JTextArea console;
+    private int currFrame,totalFrame;
 
 
-    public  UtilityMaskVideo(String _in_video, String _out_video, String mask, Semaphore semaphore, String classifierType,String fileName) throws IOException {
+    public  UtilityMaskVideo(String _in_video, String _out_video, String mask, Semaphore semaphore, String classifierType, String fileName, JFrame waitingFrame,JFrame parentPanel,JTextArea console) throws IOException {
+        this.classifierType=classifierType;
         FileUtils.cleanDirectory(new File(_out_video));
         this.faceCascade = new CascadeClassifier();
-        if(classifierType.equalsIgnoreCase("Haar Classifier"))
+        if(classifierType.equalsIgnoreCase("Haar Frontal Face"))
             this.faceCascade.load("resources/haarcascades/haarcascade_frontalface_alt.xml");
         else
-            if(classifierType.equalsIgnoreCase("LBP Classifier"))
-                this.faceCascade.load("resources/lbpcascades/lbpcascade_frontalface.xml");
+            if(classifierType.equalsIgnoreCase("Haar Eye")) {
+                this.faceCascade.load("resources/haarcascades/haarcascade_frontalface_alt.xml");
+                this.eyeClassifier= new CascadeClassifier();
+                this.eyeClassifier.load("resources/haarcascades/haarcascade_eye.xml");
+            }
         this.capture = new VideoCapture(_in_video);
 
         this.absoluteFaceSize = 0;
+        this.absoluteEyeSize = 0;
+        this.currFrame=0;
+        this.waitingPanel= waitingFrame;
+        this.parentPanel= parentPanel;
         this.writer= new VideoWriter();
         this.outfile = _out_video;
         this.maskPath= mask;
         this.coordsRoiFile = new FileWriter(_out_video+"/dataFrame.txt");
         this.semaforo=semaphore;
         this.video_in=_in_video;
+        this.console=console;
       this.fileName= fileName;
     }
 
-    public  UtilityMaskVideo(String _in_video, String _out_video, String pathDataFrame, Semaphore semaphore, String fileName) throws IOException {
+    public  UtilityMaskVideo(String _in_video, String _out_video, String pathDataFrame, Semaphore semaphore, String fileName, JFrame waitingFrame, JFrame parentPanel) throws IOException {
         this.capture = new VideoCapture(_in_video);
         this.writer= new VideoWriter();
         this.outfile = _out_video;
+        this.waitingPanel= waitingFrame;
+        this.parentPanel= parentPanel;
         this.unzipFile(pathDataFrame+"/dataFrame.zip",pathDataFrame+"/dataFrame.txt");
         dataFrameIn = new File(pathDataFrame+"/dataFrame.txt");
         in = new Scanner(dataFrameIn);
@@ -84,8 +103,13 @@ public class UtilityMaskVideo {
     public void startMasking()
     {
 
-
+        this.parentPanel.setVisible(false);
+        this.waitingPanel.setVisible(true);
+        this.console.append("Inizializzazione Parametri Masking\n");
+        this.console.append("Tipo di Masking: "+classifierType+"\n");
         Size frameSize = new Size((int) this.capture.get(Videoio.CAP_PROP_FRAME_WIDTH), (int) this.capture.get(Videoio.CAP_PROP_FRAME_HEIGHT));
+        this.totalFrame= (int) this.capture.get(Videoio.CAP_PROP_FRAME_COUNT);
+        this.console.append("Numero di Frame: "+this.totalFrame+"\n");
         int fps = (int) this.capture.get(Videoio.CAP_PROP_FPS);
 
         this.writer.open(outfile+File.separator+fileName+".avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
@@ -159,14 +183,20 @@ public class UtilityMaskVideo {
                 if (!frame.empty())
                 {
                     // face detection
-                    if(isMasking)
-                        this.detectAndDisplayAndMask(frame);
+                    if(isMasking && this.classifierType.equalsIgnoreCase("Haar Frontal Face")){
+                        this.detectAndDisplayAndMaskFace(frame);
+                        }
                     else
-                        this.detectAndDisplayAndUnmask(frame);
+                    if(isMasking && this.classifierType.equalsIgnoreCase("Haar Eye"))
+                        this.detectAndDisplayAndMaskEye(frame);
+                    else
+                        if(!isMasking)
+                            this.detectAndDisplayAndUnmask(frame);
                 }else{
+                    this.console.append("Estrazione Traccia Audio"+"\n");
+                    console.setCaretPosition(console.getDocument().getLength());
                     this.extractAudioTrack(video_in,outfile+File.separator+fileName+"_trackAudio.mp3");
                     stopAcquisition(isMasking);
-                    //System.exit(0);
                     System.out.println("FINE");
                     semaforo.release();
                 }
@@ -183,7 +213,10 @@ public class UtilityMaskVideo {
         return frame;
     }
 
-    private void detectAndDisplayAndMask(Mat frame) throws IOException {
+    private void detectAndDisplayAndMaskFace(Mat frame) throws IOException {
+
+        this.console.append("Rilevamento tratti e Masking frame "+currFrame+"/"+this.totalFrame+"\n");
+        console.setCaretPosition(console.getDocument().getLength());
         MatOfRect faces = new MatOfRect();
         Mat grayFrame = new Mat();
 
@@ -219,20 +252,21 @@ public class UtilityMaskVideo {
             Rect roi = new Rect(rect.x, rect.y, rect.width, rect.height);
             Mat matrixImgROI = matrixImgInCopy.submat(roi);
 
+
             // Formato della stringa con le informaizoni di ogni ROI: ID,X,Y
             // usiamo il carattere '-' per dividere le informazioni di ogni ROI
             coords += i + "," + rect.x + "," + rect.y + "-";
             out+= "coord= "+coords+" ";
             //Imgcodecs.imwrite("/Users/raffaeledragone/Sviluppo/UnisaWs/CompressioneDati/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
-            Imgcodecs.imwrite("/home/dangerous/Scrivania/CD/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
+            Imgcodecs.imwrite("/home/alfonso/UNISA/CompressioneDati/SecureMaskingGit/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
 
             MatOfByte mob=new MatOfByte();
             Imgcodecs.imencode(".jpg", matrixImgROI, mob);
             byte ba[]=mob.toArray();
-            byte[] ba2 = UtilCompression.compressImageInJpeg(ba, 0.50f);
-            String value = Base64.getEncoder().encodeToString(ba2);
+            //byte[] ba2 = UtilCompression.compressImageInJpeg(ba, 0.50f);
+            //String value = Base64.getEncoder().encodeToString(ba2);
 
-            //String value = Base64.getEncoder().encodeToString(ba);
+            String value = Base64.getEncoder().encodeToString(ba);
             out+="value= "+value+" ";
             File f=new File(mask);
             Mat matrixMask = Imgcodecs.imread(mask);
@@ -249,8 +283,85 @@ public class UtilityMaskVideo {
             coordsRoiFile.append(out+"\n"); //foreach frame
         else
             coordsRoiFile.append("/"+"\n");
+        ++currFrame;
+    }
+
+
+
+
+    private void detectAndDisplayAndMaskEye(Mat frame) throws IOException {
+        MatOfRect faces = new MatOfRect();
+        Mat grayFrame = new Mat();
+
+        // convert the frame in gray scale
+        Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_BGR2GRAY);
+        // equalize the frame histogram to improve the result
+        Imgproc.equalizeHist(grayFrame, grayFrame);
+
+        // compute minimum face size (20% of the frame height, in our case)
+        if (this.absoluteFaceSize == 0)
+        {
+           int height = grayFrame.rows();
+            if (Math.round(height * 0.1f) > 0)
+            {
+                this.absoluteFaceSize = Math.round(height * 0.1f);
+            }
+        }
+
+        // detect faces
+        this.faceCascade.detectMultiScale(grayFrame, faces, 1.1, 2, 0 | Objdetect.CASCADE_SCALE_IMAGE,
+                new Size(this.absoluteFaceSize, this.absoluteFaceSize), new Size());
+
+        // each rectangle in faces is a face: draw them!
+        Rect[] facesArray = faces.toArray();
+        Mat matrixImgIn = frame;
+        // Copia dell'immagine di partenza per sottrarre le ROI in modo tale che non vengano sovrascritte dopo aver applicato la maschera
+        Mat matrixImgInCopy = frame;
+        String mask = maskPath;
+        String out="";
+        int i = 1;
+        for (Rect rect : faces.toArray()) {
+            String coords = "";
+            Rect roi = new Rect(rect.x, rect.y, rect.width, rect.height);
+            Mat matrixImgROI = matrixImgInCopy.submat(roi);
+            MatOfRect eyes = new MatOfRect();
+            Mat grayFrameEye = new Mat();
+            Imgproc.cvtColor(matrixImgROI, grayFrameEye, Imgproc.COLOR_BGR2GRAY);
+            // equalize the frame histogram to improve the result
+            Imgproc.equalizeHist(grayFrameEye, grayFrameEye);
+
+            this.eyeClassifier.detectMultiScale(grayFrameEye,eyes,1.1,5);
+            for(Rect eye: eyes.toArray()){
+                File f=new File(mask);
+                Mat matrixMask = Imgcodecs.imread(mask);
+                Mat matrixMaskResized = new Mat();
+                Imgproc.resize(matrixMask, matrixMaskResized, new Size(eye.width, eye.height));
+                Mat matrixImgSecure = matrixImgROI.submat(new Rect(eye.x, eye.y, matrixMaskResized.cols(), matrixMaskResized.rows()));
+                matrixMaskResized.copyTo(matrixImgSecure);
+                coords =  eye.x + "," + eye.y + "-";
+                out+= "coord= "+coords+" ";
+
+
+
+                MatOfByte mob=new MatOfByte();
+                Imgcodecs.imencode(".jpg", matrixImgROI, mob);
+                byte ba[]=mob.toArray();
+
+                String value = Base64.getEncoder().encodeToString(ba);
+                out+="value= "+value+" ";
+            }
+
+
+        }
+
+        if(out!= "")
+            coordsRoiFile.append(out+"\n"); //foreach frame
+        else
+            coordsRoiFile.append("/"+"\n");
 
     }
+
+
 
     private void extractAudioTrack(String _input, String _output){
 
@@ -364,11 +475,17 @@ public class UtilityMaskVideo {
                 this.zipFile(this.outfile+"/dataFrame.txt",this.outfile+"/dataFrame.zip");
                 this.capture.release();
                 if(isMasking){
+                    this.console.append("Ricostruzione video con traccia Audio");
+                    console.setCaretPosition(console.getDocument().getLength());
                     this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
+                    this.console.append("Eliminazione file intermedi"+"\n");
+                    console.setCaretPosition(console.getDocument().getLength());
                     File intermedieVideo = new File(outfile+File.separator+fileName+".avi");
                     File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
                     intermedieVideo.delete();
                     audioTrack.delete();
+                    parentPanel.setVisible(true);
+                    waitingPanel.dispatchEvent(new WindowEvent(waitingPanel, WindowEvent.WINDOW_CLOSING));
                 }
                 else{
                     this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",outfile+File.separator+fileName+"_decompressed.mp4");
@@ -383,6 +500,8 @@ public class UtilityMaskVideo {
                 // log any exception
                 System.err.println("Exception in stopping the frame capture, trying to release the camera now... " + e);
             }
+
+
         }
 
 
