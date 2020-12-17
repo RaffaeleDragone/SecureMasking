@@ -1,5 +1,6 @@
 package it.unisa.compressionedati.utils;
 
+import com.pngencoder.PngEncoder;
 import it.unisa.compressionedati.beans.StegoImage;
 
 import javax.crypto.*;
@@ -20,43 +21,70 @@ import java.util.zip.GZIPOutputStream;
 
 public class UtilStepanography {
 
-    private static final String MARKER_START_STEGANOMESS = "DRBC";
+    private final String FINGERPRINT_MESSAGE = "DRBC";
+    private int offset;
+    private int width;
+    private int height;
+    private byte[] carrier;
+    private String hiddenMessage;
+    private boolean encryption;
+    private boolean compression;
+
+    public String getDecodedMessage() {
+        return hiddenMessage;
+    }
+
+    public boolean isEncryption() {
+        return encryption;
+    }
+
+    public void setEncryption(boolean encrypt) {
+        this.encryption = encrypt;
+    }
+
+    public boolean isCompression() {
+        return compression;
+    }
+
+    public void setCompression(boolean compression) {
+        this.compression = compression;
+    }
 
 
-    public static byte[] hide(byte[] data, String secretMessage, char[] password, boolean compress, boolean encrypt) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
-        StegoImage stegoImage=new StegoImage();
-        stegoImage.setImg(data);
+    public ArrayList<byte[]> hideNew(ArrayList<byte[]> imgsBytes, String secretFile, char[] password) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
+        ArrayList<byte[]> listOut=new ArrayList<>();
 
-        ByteArrayInputStream bais = new ByteArrayInputStream(stegoImage.getImg());
+        if (secretFile == null) {
+            throw new FileNotFoundException("");
+        }
 
-        BufferedImage image = ImageIO.read(bais);
-        stegoImage.setWidth(image.getWidth());
-        stegoImage.setHeight(image.getHeight());
-
-        if (encrypt) {
+        if (encryption) {
             if (password == null) {
                 throw new IllegalArgumentException("Encryption cannot be done with no password");
             }
         }
 
-        byte[] payload = secretMessage.getBytes();
-        byte[] fingerprinMsg = MARKER_START_STEGANOMESS.getBytes();
+        byte[] payload = secretFile.getBytes();
+        byte[] fingerprinMsg = FINGERPRINT_MESSAGE.getBytes();
+
         String imageFileNameWithoutExt = null;
+
         File imageFile = null;
         int payloadSize = payload.length;
         int freeSpaceInCarrier = 0;
         int _bytesWritten;
         int payloadOffset = 0;
 
+
         //System.out.println("Encryption:" + encryption);
         //System.out.println("Compression:" + compression);
         //System.out.println("Payload Size:" + payloadSize);
-        if (compress) {
+        if (compression) {
             payload = compressPayload(payload);
             payloadSize = payload.length;
             //System.out.println("Compressed Size:" + payloadSize);
         }
-        if (encrypt) {
+        if (encryption) {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.reset();
             md.update(new String(password).getBytes());
@@ -68,65 +96,79 @@ public class UtilStepanography {
 
         //System.out.println("Files Found: " + carriers.length);
         //System.out.println(sectretFname);
-
-        stegoImage.setOffset(0);
-        _bytesWritten = 0;
-        imageFile = new File("outputimage.png");
-        imageFileNameWithoutExt = "outputimage";
-        //System.out.println(imageFileNameWithoutExt);
-        stegoImage.setImg(convertImageToRGBPixels(stegoImage,stegoImage.getImg()));
-
-        freeSpaceInCarrier = stegoImage.getImg().length / 8;
-        //System.out.println("FreeSpace In frame: " + freeSpaceInCarrier);
-        freeSpaceInCarrier -= encode(stegoImage,fingerprinMsg, 4, 0);
-        freeSpaceInCarrier -= encode(stegoImage,getBytes(payloadSize), 4, 0);
+        for (int i = 0; i < imgsBytes.size(); i++) {
+            offset = 0;
+            _bytesWritten = 0;
+            //imageFile = new File(carrierDir + "/temp" + i+".png");
 
 
-        if (freeSpaceInCarrier < payloadSize) {
-            _bytesWritten = encode(stegoImage,payload, freeSpaceInCarrier, payloadOffset);
-        } else {
-            _bytesWritten = encode(stegoImage,payload, payloadSize, payloadOffset);
+            //System.out.println(imageFileNameWithoutExt);
+            ByteArrayInputStream bais = new ByteArrayInputStream(imgsBytes.get(i));
+
+            BufferedImage image = ImageIO.read(bais);
+            imageFileNameWithoutExt = getFilenameWithoutExtension(i+"");
+            carrier = convertImageToRGBPixels(image);
+
+            freeSpaceInCarrier = carrier.length / 8;
+            //System.out.println("FreeSpace In Carrier: " + freeSpaceInCarrier);
+            freeSpaceInCarrier -= encode(fingerprinMsg, 4, 0);
+
+            //freeSpaceInCarrier -= encode(getBytes(i), 4, 0);
+
+            if (i == 0) {
+                freeSpaceInCarrier -= encode(getBytes(payloadSize), 4, 0);
+
+                //freeSpaceInCarrier -= encode(getBytes(fnameLen), 4, 0);
+
+                //freeSpaceInCarrier -= encode(sectretFname.getBytes(), sectretFname.getBytes().length, 0);
+
+                //freeSpaceInCarrier -= encode(getBytes(message.getBytes().length), 4, 0);
+            }
+
+
+            if (freeSpaceInCarrier < payloadSize) {
+                _bytesWritten = encode(payload, freeSpaceInCarrier, payloadOffset);
+            } else {
+                _bytesWritten = encode(payload, payloadSize, payloadOffset);
+            }
+            freeSpaceInCarrier -= _bytesWritten;
+            //System.out.println("(Payload)Bytes Written: " + _bytesWritten);
+            payloadSize -= _bytesWritten;
+            payloadOffset += _bytesWritten;
+            //System.out.println("Bytes Remaining: " + (payloadSize));
+            //System.out.println("Payload Offset: " + payloadOffset);
+            byte[] bytes = new PngEncoder()
+                    .withBufferedImage(convertRGBPixelsToImage(carrier))
+                    .withCompressionLevel(1)
+                    .toBytes();
+            listOut.add(bytes);
+            if (payloadSize > 0) {
+                //System.out.println("@continue");
+                continue;
+            } else {
+                break;
+            }
         }
-        freeSpaceInCarrier -= _bytesWritten;
-        //System.out.println("(Payload)Bytes Written: " + _bytesWritten);
-        payloadSize -= _bytesWritten;
-        payloadOffset += _bytesWritten;
-        //System.out.println("Bytes Remaining: " + (payloadSize));
-        //System.out.println("Payload Offset: " + payloadOffset);
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ImageIO.write(convertRGBPixelsToImage(stegoImage.getImg(),stegoImage.getWidth(),stegoImage.getHeight()), "png", bos);
-        byte[] bytes = bos.toByteArray();
-
-        if (payloadSize > 0) {
-            //System.out.println("File non inserito del tutto");
-        } else {
-            //System.out.println("File steganografato correttamente");
-        }
-
         if (payloadSize > 0) {
             throw new IllegalArgumentException("Not enough cover images");
         }
-
-        return bytes;
-
+        return listOut;
     }
 
 
-    private static int encode(StegoImage stegoImage, byte[] payload, int bytesToWrite, int payloadOffset) {
-
+    private int encode(byte[] payload, int bytesToWrite, int payloadOffset) {
         int bytesWritten = 0;
         for (int i = 0; i < bytesToWrite; i++, payloadOffset++) {
             int payloadByte = payload[payloadOffset];
             bytesWritten++;
-            for (int bit = 7; bit >= 0; --bit, stegoImage.setOffset(stegoImage.getOffset()+1)) {
+            for (int bit = 7; bit >= 0; --bit, ++offset) {
                 //assign an integer to b,shifted by bit spaces AND 1
                 //a single bit of the current byte
                 int b = (payloadByte >>> bit) & 1;
                 //assign the bit by taking[(previous byte value) AND 0xfe]
                 //or bit to
                 try {
-                    int offset = stegoImage.getOffset();
-                    stegoImage.getImg()[offset] = (byte) ((stegoImage.getImg()[offset] & 0xFE) | b);
+                    carrier[offset] = (byte) ((carrier[offset] & 0xFE) | b);
                 } catch (ArrayIndexOutOfBoundsException aiobe) {
                     //System.err.println(aiobe.getMessage());
                 }
@@ -148,64 +190,58 @@ public class UtilStepanography {
     }
 
 
-    public static String reveal(byte[] data, char[] password, boolean compress, boolean encrypt) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
-        String out=null;
-
-        StegoImage stegoImage=new StegoImage();
-        stegoImage.setImg(data);
-        ByteArrayInputStream bais = new ByteArrayInputStream(stegoImage.getImg());
-
-        BufferedImage image = ImageIO.read(bais);
-        stegoImage.setWidth(image.getWidth());
-        stegoImage.setHeight(image.getHeight());
-
-
+    public String revealNew(ArrayList<byte[]> imgsBytes, char[] password) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
         byte payload[] = null;
         byte[] tmp = null;
         int payloadRemaining = 0;
-        int fnameSize = 0;
         int payloadSize  = 0;
-        String fname = null;
-        String[] carriers = null;
+
         int msgLen = 0;
         int bytesToDecodeFromCarrier = 0;
         ArrayList<byte[]> payloadData = new ArrayList<byte[]>();
-        FileOutputStream fOutStream;
 
-        stegoImage.setOffset(0);
+        String output="";
+        for (int i = 0; i < imgsBytes.size(); i++) {
+            offset = 0;
+            ByteArrayInputStream bais = new ByteArrayInputStream(imgsBytes.get(i));
 
-        stegoImage.setImg(convertImageToRGBPixels(stegoImage,stegoImage.getImg()));
-        if (!isStegnographed(stegoImage)) {
-            System.out.println("Not stegano image!");
-            return null;
+            BufferedImage image = ImageIO.read(bais);
+            carrier = convertImageToRGBPixels(image);
+
+
+            if (!isStegnographed(carrier)) {
+                continue;
+            }
+            //System.out.println("Encryption:" + encryption);
+            //System.out.println("Compression:" + compression);
+            bytesToDecodeFromCarrier = carrier.length / 8 - 4;// - 4 bcoz we have already decoded the fingerprint
+            //System.out.println("Bytes to Decode: " + bytesToDecodeFromCarrier);
+            if (i == 0) {
+                tmp = decode(carrier, 4); //extracting the payload size
+                payloadSize = toInteger(tmp);
+                payloadRemaining = payloadSize;
+                bytesToDecodeFromCarrier -= 4;
+                //System.out.println("Bytes to Decode: " + bytesToDecodeFromCarrier);
+                //System.out.println("Payload Size: " + payloadSize);
+            }
+            if (payloadRemaining > bytesToDecodeFromCarrier) {
+                payload = decode(carrier, bytesToDecodeFromCarrier);
+                payloadRemaining = payloadRemaining - bytesToDecodeFromCarrier;
+            } else {
+                payload = decode(carrier, payloadRemaining);
+                payloadRemaining = payloadRemaining - payloadRemaining;
+            }
+
+
+            //System.out.println("payload Remaining " + payloadRemaining);
+            payloadData.add(payload);
+            //payloadData.put(i, payload);
+            if (payloadRemaining == 0) {
+                break;
+            }
+
+
         }
-        //System.out.println("Encryption:" + encryption);
-        //System.out.println("Compression:" + compression);
-        bytesToDecodeFromCarrier = stegoImage.getImg().length / 8 - 4;// - 4 bcoz we have already decoded the fingerprint
-        //System.out.println("Bytes to Decode: " + bytesToDecodeFromCarrier);
-        tmp = decode(stegoImage, 4); //extracting the payload size
-        payloadSize = toInteger(tmp);
-        payloadRemaining = payloadSize;
-        bytesToDecodeFromCarrier -= 4;
-
-        if (payloadRemaining > bytesToDecodeFromCarrier) {
-            payload = decode(stegoImage, bytesToDecodeFromCarrier);
-            payloadRemaining = payloadRemaining - bytesToDecodeFromCarrier;
-        } else {
-            payload = decode(stegoImage, payloadRemaining);
-            payloadRemaining = payloadRemaining - payloadRemaining;
-        }
-
-
-        //System.out.println("payload Remaining " + payloadRemaining);
-        payloadData.add(payload);
-        //payloadData.put(i, payload);
-        if (payloadRemaining == 0) {
-            System.out.println("Finished success");
-
-        }
-
-
         if (payloadRemaining > 0) {
             throw new IllegalArgumentException("Some Stego Files missing!");
         }
@@ -221,7 +257,7 @@ public class UtilStepanography {
                     secretData[ptr] = tmpArray[j];
                 }
             }
-            if (encrypt) {
+            if (encryption) {
                 MessageDigest md = MessageDigest.getInstance("SHA-256");
                 md.reset();
                 md.update(new String(password).getBytes());
@@ -230,7 +266,7 @@ public class UtilStepanography {
                 //System.out.println("Decrypted Size:" + payloadSize);
             }
 
-            if (compress) {
+            if (compression) {
                 secretData = decompressPayload(secretData);
                 payloadSize = secretData.length;
                 //System.out.println("Uncompressed Size:" + payloadSize);
@@ -245,21 +281,19 @@ public class UtilStepanography {
             for (int j = 0; j < (msgLen); j++) {
                 message[j] = secretData[j + (payloadSize - msgLen)];
             }
-
-            out = new String(secretFile, StandardCharsets.UTF_8);
-
+            hiddenMessage = new String(message);
+            String res = new String(secretFile, StandardCharsets.UTF_8);
+            output+=res;
         }
-        return out;
+        return output;
     }
 
-
-    private static byte[] decode(StegoImage stegoImage, int bytesToRead) {
+    private byte[] decode(byte[] carrier, int bytesToRead) {
         byte[] _decode = new byte[bytesToRead];
         for (int i = 0; i < _decode.length; ++i) {
-            for (int bit = 0; bit < 8; ++bit, stegoImage.setOffset(stegoImage.getOffset()+1)) {
+            for (int bit = 0; bit < 8; ++bit, ++offset) {
                 try {
-                    int offset = stegoImage.getOffset();
-                    _decode[i] = (byte) ((_decode[i] << 1) | (stegoImage.getImg()[offset] & 1));
+                    _decode[i] = (byte) ((_decode[i] << 1) | (carrier[offset] & 1));
                 } catch (ArrayIndexOutOfBoundsException aiobe) {
                     //System.err.println("OK" + aiobe.getMessage());
                 }
@@ -268,7 +302,13 @@ public class UtilStepanography {
         return _decode;
     }
 
-    private static BufferedImage convertRGBPixelsToImage(byte[] carrier, int width, int height) {
+    /**
+     * Converts a byte array with RGB pixel values to
+     * a bufferedImage
+     * @param carrier byte array of RGB pixels
+     * @return BufferedImage
+     */
+    private BufferedImage convertRGBPixelsToImage(byte[] carrier) {
         ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_sRGB);
         int[] nBits = {8, 8, 8};
         int[] bOffs = {2, 1, 0}; // band offsets r g b
@@ -283,12 +323,16 @@ public class UtilStepanography {
         return new BufferedImage(colorModel, raster, false, null);
     }
 
-    private static byte[] convertImageToRGBPixels(StegoImage stegoImage,byte[] img) throws IOException {
-        ByteArrayInputStream bais = new ByteArrayInputStream(img);
-
-        BufferedImage image = ImageIO.read(bais);
-        int width = stegoImage.getWidth();
-        int height = stegoImage.getHeight();
+    /**
+     * Converts an Image to RG pixel array
+     * @param filename image to convert
+     * @return byte array
+     * @throws IOException
+     */
+    private byte[] convertImageToRGBPixels(File filename) throws IOException {
+        BufferedImage image = ImageIO.read(filename);
+        width = image.getWidth();
+        height = image.getHeight();
         BufferedImage clone = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
         Graphics2D graphics = clone.createGraphics();
         graphics.drawRenderedImage(image, null);
@@ -299,8 +343,21 @@ public class UtilStepanography {
         return buff.getData();
     }
 
+    public byte[] convertImageToRGBPixels(BufferedImage image) throws IOException {
+        //BufferedImage image = ImageIO.read(filename);
+        width = image.getWidth();
+        height = image.getHeight();
+        BufferedImage clone = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+        Graphics2D graphics = clone.createGraphics();
+        graphics.drawRenderedImage(image, null);
+        graphics.dispose();
+        image.flush();
+        WritableRaster raster = clone.getRaster();
+        DataBufferByte buff = (DataBufferByte) raster.getDataBuffer();
+        return buff.getData();
+    }
 
-    private static byte[] compressPayload(byte[] payload) throws IOException {
+    private byte[] compressPayload(byte[] payload) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         GZIPOutputStream zos = new GZIPOutputStream(bos);
         zos.write(payload);
@@ -310,7 +367,7 @@ public class UtilStepanography {
         return bos.toByteArray();
     }
 
-    private static byte[] decompressPayload(byte[] payload) throws IOException {
+    private byte[] decompressPayload(byte[] payload) throws IOException {
         ByteArrayInputStream bis = new ByteArrayInputStream(payload);
         GZIPInputStream zis = new GZIPInputStream(bis);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -326,7 +383,7 @@ public class UtilStepanography {
         return payload;
     }
 
-    private static byte[] encryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
+    private byte[] encryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
         SecretKeySpec key = new SecretKeySpec(password, "AES");
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.ENCRYPT_MODE, key);
@@ -339,7 +396,8 @@ public class UtilStepanography {
         return cipherText;
     }
 
-    private static byte[] decryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
+
+    private byte[] decryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
         SecretKeySpec key = new SecretKeySpec(password, "AES");
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(Cipher.DECRYPT_MODE, key);
@@ -353,20 +411,56 @@ public class UtilStepanography {
     }
 
 
-    private static int toInteger(byte[] b) {
+    private String getFilenameWithoutExtension(String name) {
+        return name.replaceFirst("[.][^.]+$", "");
+    }
+
+
+    private int toInteger(byte[] b) {
         return (b[0] << 24 | (b[1] & 0xFF) << 16 | (b[2] & 0xFF) << 8 | (b[3] & 0xFF));
     }
 
-    private static byte[] getBytes(int i) {
+
+    private byte[] getBytes(File file) throws java.io.IOException {
+        InputStream is = new FileInputStream(file);
+        // Get the size of the file
+        long length = file.length();
+        // You cannot create an array using a long type.
+        // It needs to be an int type.
+        // Before converting to an int type, check
+        // to ensure that file is not larger than Integer.MAX_VALUE.
+        if (length > Integer.MAX_VALUE) {
+            // File is too large
+        }
+        // Create the byte array to hold the data
+        byte[] bytes = new byte[(int) length];
+        // Read in the bytes
+        int offset = 0;
+        int numRead = 0;
+        while (offset < bytes.length && (numRead = is.read(bytes, offset, bytes.length - offset)) >= 0) {
+            offset += numRead;
+        }
+        // Ensure all the bytes have been read in
+        if (offset < bytes.length) {
+            throw new IOException("Could not completely read file " + file.getName());
+        }
+        // Close the input stream and return bytes
+        is.close();
+        return bytes;
+    }
+
+
+    private byte[] getBytes(int i) {
         return (new byte[]{(byte) (i >> 24), (byte) (i >> 16), (byte) (i >> 8), (byte) i});
     }
 
-    private static boolean isStegnographed(StegoImage stegoImage) {
+
+    private boolean isStegnographed(byte[] carrier) {
         byte[] tmp = new byte[4];
         String fingerPrint = null;
-        tmp = decode(stegoImage, 4);
+        tmp = decode(carrier, 4);
         fingerPrint = new String(tmp);
-        if (!fingerPrint.equals(MARKER_START_STEGANOMESS)) {
+        if (!fingerPrint.equals(FINGERPRINT_MESSAGE)) {
             return false;
         }
         return true;
