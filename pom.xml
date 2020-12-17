@@ -25,7 +25,11 @@
             <artifactId>commons-io</artifactId>
             <version>2.6</version>
         </dependency>
-
+        <dependency>
+            <groupId>com.pngencoder</groupId>
+            <artifactId>pngencoder</artifactId>
+            <version>0.11.0</version>
+        </dependency>
 
     </dependencies>
 
@@ -93,14 +97,14 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>it.futbrothers.futbotloganalyzer.logic.LogAnalyzer</mainClass>
+                            <mainClass>it.unisa.compressionedati.main.Main</mainClass>
                         </manifest>
                         <manifestEntries>
                             <Class-Path>.</Class-Path>
                         </manifestEntries>
                     </archive>
 
-                    <finalName>FutbotLogAnalyzer/FutbotLogAnalyzer</finalName>
+                    <finalName>SecureMasking/SecureMasking</finalName>
                 </configuration>
             </plugin>
             <plugin>

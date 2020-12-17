@@ -1,7 +1,7 @@
 package it.unisa.compressionedati.utils;
 
 import com.pngencoder.PngEncoder;
-import it.unisa.compressionedati.beans.StegoImage;
+
 
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
