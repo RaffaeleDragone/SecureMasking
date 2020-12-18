@@ -4,6 +4,7 @@ import com.pngencoder.PngEncoder;
 
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -11,10 +12,7 @@ import java.awt.color.ColorSpace;
 import java.awt.image.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
+import java.security.*;
 import java.util.ArrayList;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -29,6 +27,7 @@ public class UtilStepanography {
     private String hiddenMessage;
     private boolean encryption;
     private boolean compression;
+    private String encryptionMode;
 
     public String getDecodedMessage() {
         return hiddenMessage;
@@ -50,8 +49,15 @@ public class UtilStepanography {
         this.compression = compression;
     }
 
+    public String getEncryptionMode() {
+        return encryptionMode;
+    }
 
-    public ArrayList<byte[]> hideNew(ArrayList<byte[]> imgsBytes, String secretFile, char[] password) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
+    public void setEncryptionMode(String encryptionMode) {
+        this.encryptionMode = encryptionMode;
+    }
+
+    public ArrayList<byte[]> hide(ArrayList<byte[]> imgsBytes, String secretFile, char[] password) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         ArrayList<byte[]> listOut=new ArrayList<>();
 
         if (secretFile == null) {
@@ -61,6 +67,9 @@ public class UtilStepanography {
         if (encryption) {
             if (password == null) {
                 throw new IllegalArgumentException("Encryption cannot be done with no password");
+            }
+            if (encryptionMode == null) {
+                throw new IllegalArgumentException("Encryption cannot be done with no encryption mode");
             }
         }
 
@@ -117,12 +126,7 @@ public class UtilStepanography {
 
             if (i == 0) {
                 freeSpaceInCarrier -= encode(getBytes(payloadSize), 4, 0);
-String out1="";
-                //freeSpaceInCarrier -= encode(getBytes(fnameLen), 4, 0);
 
-                //freeSpaceInCarrier -= encode(sectretFname.getBytes(), sectretFname.getBytes().length, 0);
-
-                //freeSpaceInCarrier -= encode(getBytes(message.getBytes().length), 4, 0);
             }
 
 
@@ -190,7 +194,17 @@ String out1="";
     }
 
 
-    public String revealNew(ArrayList<byte[]> imgsBytes, char[] password) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
+    public String reveal(ArrayList<byte[]> imgsBytes, char[] password) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+
+        if (encryption) {
+            if (password == null) {
+                throw new IllegalArgumentException("Decryption cannot be done with no password");
+            }
+            if (encryptionMode == null) {
+                throw new IllegalArgumentException("Decryption cannot be done with no Decryption mode");
+            }
+        }
+
         byte payload[] = null;
         byte[] tmp = null;
         int payloadRemaining = 0;
@@ -383,31 +397,71 @@ String out1="";
         return payload;
     }
 
-    private byte[] encryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
-        SecretKeySpec key = new SecretKeySpec(password, "AES");
-        Cipher cipher = Cipher.getInstance("AES");
-        cipher.init(Cipher.ENCRYPT_MODE, key);
+    private byte[] encryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, InvalidAlgorithmParameterException {
+        if(this.encryptionMode!=null){
+            SecretKeySpec key = new SecretKeySpec(password, "AES");
 
-        byte[] cipherText = new byte[cipher.getOutputSize(payload.length)];
-        int ctLength = cipher.update(payload, 0, payload.length, cipherText, 0);
-        ctLength += cipher.doFinal(cipherText, ctLength);
-        //System.out.println(new String(cipherText));
-        //System.out.println(ctLength);
-        return cipherText;
+            //Create IvParameterSpec
+            IvParameterSpec ivSpec = null;
+            String encM = null;
+            if(this.encryptionMode=="ECB"){
+                encM = "AES/ECB/PKCS5Padding";
+            }else{
+                byte[] IV = new byte[16];
+                ivSpec=new IvParameterSpec(IV);
+                if (this.encryptionMode == "CBC")
+                    encM = "AES/CBC/PKCS5Padding";
+                else if(this.encryptionMode=="CFB")
+                    encM = "AES/CFB/PKCS5Padding";
+                else if(this.encryptionMode=="OFB")
+                    encM = "AES/OFB/PKCS5Padding";
+            }
+            Cipher cipher = Cipher.getInstance(encM);
+
+            cipher.init(Cipher.ENCRYPT_MODE, key, ivSpec);
+
+            byte[] cipherText = new byte[cipher.getOutputSize(payload.length)];
+            int ctLength = cipher.update(payload, 0, payload.length, cipherText, 0);
+            ctLength += cipher.doFinal(cipherText, ctLength);
+            //System.out.println(new String(cipherText));
+            //System.out.println(ctLength);
+            return cipherText;
+        }
+        return null;
     }
 
 
-    private byte[] decryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException {
-        SecretKeySpec key = new SecretKeySpec(password, "AES");
-        Cipher cipher = Cipher.getInstance("AES");
-        cipher.init(Cipher.DECRYPT_MODE, key);
-        byte[] plainText = new byte[cipher.getOutputSize(payload.length)];
-        int ptLength = cipher.update(payload, 0, payload.length, plainText, 0);
-        ptLength += cipher.doFinal(plainText, ptLength);
-        //System.out.println(new String(plainText));
-        //System.out.println(ptLength);
-        //payloadSize = ptLength;
-        return plainText;
+    private byte[] decryptPayload(byte[] payload, byte[] password) throws NoSuchAlgorithmException, NoSuchProviderException, NoSuchPaddingException, InvalidKeyException, IllegalStateException, ShortBufferException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
+        if(this.encryptionMode!=null){
+            SecretKeySpec key = new SecretKeySpec(password, "AES");
+            IvParameterSpec ivSpec = null;
+            String encM = null;
+            if(this.encryptionMode=="ECB"){
+                encM = "AES/ECB/PKCS5Padding";
+            }else{
+                byte[] IV = new byte[16];
+                ivSpec=new IvParameterSpec(IV);
+                if (this.encryptionMode == "CBC")
+                    encM = "AES/CBC/PKCS5Padding";
+                else if(this.encryptionMode=="CFB")
+                    encM = "AES/CFB/PKCS5Padding";
+                else if(this.encryptionMode=="OFB")
+                    encM = "AES/OFB/PKCS5Padding";
+            }
+            Cipher cipher = Cipher.getInstance(encM);
+
+
+            //Initialize Cipher for DECRYPT_MODE
+            cipher.init(Cipher.DECRYPT_MODE, key, ivSpec);
+            byte[] plainText = new byte[cipher.getOutputSize(payload.length)];
+            int ptLength = cipher.update(payload, 0, payload.length, plainText, 0);
+            ptLength += cipher.doFinal(plainText, ptLength);
+            //System.out.println(new String(plainText));
+            //System.out.println(ptLength);
+            //payloadSize = ptLength;
+            return plainText;
+        }
+        return null;
     }
 
 

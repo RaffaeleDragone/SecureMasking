@@ -27,6 +27,7 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.lang.reflect.Array;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -453,7 +454,7 @@ public class UtilityMaskVideo {
 
     private void detectAndDisplayAndUnmask(Mat frame) throws IOException {
         //for each frame
-        if(temp<23){
+        if(temp<30){
             MatOfByte mob=new MatOfByte();
             Imgcodecs.imencode(".png", frame, mob);
             byte ba[]=mob.toArray();
@@ -461,7 +462,7 @@ public class UtilityMaskVideo {
                 BufferedImage image = ImageIO.read(bais);
                 new PngEncoder()
                         .withBufferedImage(image)
-                        .toFile(new File("/home/alfonso/eliminare/"+temp+".png"));
+                        .toFile(new File("/Users/raffaeledragone/Sviluppo/UnisaWs/Compressione Dati/LocalStego/outputstegano/"+temp+".png"));
                 ++temp;
 
         }
@@ -521,8 +522,9 @@ public class UtilityMaskVideo {
                 UtilStepanography steno= new UtilStepanography();
                 steno.setCompression(true);
                 steno.setEncryption(true);
+                steno.setEncryptionMode("CBC");
                 int i=0;
-                ArrayList<byte[]> list =steno.hideNew(listFrame,out,password);
+                ArrayList<byte[]> list =steno.hide(listFrame,out,password);
 
                 this.waitingPanel.writeOnConsole(("END: Stenografia "+"\n"+"Frame Utilizzati per stenografare: "+list.size()));
 
@@ -532,16 +534,6 @@ public class UtilityMaskVideo {
                     this.waitingPanel.writeOnConsole(("Scrittura frame stenografato: "+i+"/"+list.size()));
 
                     Mat mat = Imgcodecs.imdecode(new MatOfByte(list.get(i)),Imgcodecs.IMREAD_UNCHANGED);
-                    /*MatOfByte mob=new MatOfByte();
-                    Imgcodecs.imencode(".png", mat, mob);
-                    byte ba[]=mob.toArray();
-                    ByteArrayInputStream bais = new ByteArrayInputStream(ba);
-                    BufferedImage image = ImageIO.read(bais);
-                    new PngEncoder()
-                            .withBufferedImage(image)
-                            .toFile(new File("/home/alfonso/eliminare/"+i+".png"));
-
-*/
                     writer.write(mat);
 
                 }
@@ -558,16 +550,8 @@ public class UtilityMaskVideo {
                 this.writer.release();
 
                 this.waitingPanel.writeOnConsole(("Inserimento traccia audio"));
-                this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.avi");
-
-               /* for (byte[] bs : list) {
-                    ByteArrayInputStream bais = new ByteArrayInputStream(bs);
-                    BufferedImage image = ImageIO.read(bais);
-                    new PngEncoder()
-                            .withBufferedImage(image)
-                            .toFile(new File("/home/alfonso/eliminare/"+i+".png"));
-                    ++i;
-                }*/
+                String name_newaudio=this.execFFmpegWriteMetadataOnAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3","custom_mt_nframe",list.size()+"");
+                this.execFFmpegAddAudioTrack(name_newaudio,outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.avi");
 
 
                 if(in != null)
@@ -590,11 +574,11 @@ public class UtilityMaskVideo {
                     waitingPanel.dispatchEvent(new WindowEvent(waitingPanel, WindowEvent.WINDOW_CLOSING));
                 }
                 else{
-                    /*this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",outfile+File.separator+fileName+"_decompressed.mp4");
+                    this.execFFmpegWriteMetadataOnAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",outfile+File.separator+fileName+"_decompressed.mp4");
                     File intermedieVideo = new File(outfile+File.separator+fileName+"_decompressed.avi");
                     File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
                     intermedieVideo.delete();
-                    audioTrack.delete();*/
+                    audioTrack.delete();
                 }
             }
             catch (InterruptedException | IOException e)
@@ -615,6 +599,8 @@ public class UtilityMaskVideo {
                 e.printStackTrace();
             } catch (IllegalBlockSizeException e) {
                 e.printStackTrace();
+            } catch (InvalidAlgorithmParameterException e) {
+                e.printStackTrace();
             }
 
 
@@ -627,6 +613,42 @@ public class UtilityMaskVideo {
             // release the camera
             this.capture.release();
         }
+    }
+
+    private String execFFmpegWriteMetadataOnAudioTrack(String path_trackaudio, String name_metadata, String metadata_value) throws IOException {
+        String args="";
+        String os = System.getProperty("os.name").toLowerCase();
+        if(os.contains("windows"))
+            args="cmd /C start ";
+        //ffmpeg -i a_secure.avi_trackAudio.mp3 -c copy -metadata customMeta="22" a_secure.avi_trackAudio.mp3
+        String name_audiotrack = path_trackaudio.replaceAll(".mp3","");
+        name_audiotrack+="_mt.mp3";
+        args += "ffmpeg -i "+path_trackaudio+" -c copy -metadata "+name_metadata+"="+metadata_value+" "+name_audiotrack+"";
+
+        System.out.print(args);
+        String dir =System.getProperty("user.dir")+"/resources/ffmpeg/";
+        Process p = Runtime.getRuntime().exec(args,null, new File(dir));
+
+        BufferedReader stdInput = new BufferedReader(new
+                InputStreamReader(p.getInputStream()));
+
+        BufferedReader stdError = new BufferedReader(new
+                InputStreamReader(p.getErrorStream()));
+
+        // Read the output from the command
+        System.out.println("Here is the standard output of the command:\n");
+        String s = null;
+        while ((s = stdInput.readLine()) != null) {
+            System.out.println(s);
+        }
+
+        // Read any errors from the attempted command
+        System.out.println("Here is the standard error of the command (if any):\n");
+        while ((s = stdError.readLine()) != null) {
+            System.out.println(s);
+        }
+
+        return name_audiotrack;
     }
 
     private void unzipFile(String source, String target) throws IOException {
@@ -670,14 +692,14 @@ public class UtilityMaskVideo {
     }
 
 
-    public boolean execJavaScript( String audio_input, String video_input, String video_out) throws IOException, InterruptedException
+    public boolean execFFmpegAddAudioTrack( String audio_input, String video_input, String video_out) throws IOException, InterruptedException
     {
 
         String args="";
         String os = System.getProperty("os.name").toLowerCase();
         if(os.contains("windows"))
             args="cmd /C start ";
-        args = "ffmpeg -i "+video_input+" -i "+audio_input+" -c:v copy -c:a aac "+video_out;
+        args += "ffmpeg -i "+video_input+" -i "+audio_input+" -c:v copy -c:a aac "+video_out;
 
         System.out.print(args);
         String dir =System.getProperty("user.dir")+"/resources/ffmpeg/";
