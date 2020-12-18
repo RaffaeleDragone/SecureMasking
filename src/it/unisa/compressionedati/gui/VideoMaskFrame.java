@@ -96,19 +96,8 @@ public class VideoMaskFrame extends JFrame {
 
                 try {
                     semaforo.acquire();
-                    JFrame waitingPanel = new JFrame();
-                    waitingPanel.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                    waitingPanel.setSize(500,250);
-                    waitingPanel.setLocation(btn.getX(),btn.getY());
-                    //waitingPanel.setUndecorated(true);
-                    JTextArea console = new JTextArea();
-                    JScrollPane scr = new JScrollPane(console,
-                            JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
-                            JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-                    console.setSize(470,240);
-                    console.setEditable(false);
-                    waitingPanel.add(scr);
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType, fileName,waitingPanel,VideoMaskFrame.this,console);
+                    WaitingPanelFrame waitingFrame= new WaitingPanelFrame(VideoMaskFrame.this);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType, fileName,waitingFrame);
                     videoMask.startMasking();
 
                 } catch (IOException | InterruptedException ioException) {
@@ -155,12 +144,8 @@ public class VideoMaskFrame extends JFrame {
                 String fileName= (combo.getSelectedItem().toString()).replace(".mp4","");
                 try {
                     semaforo.acquire();
-                    JFrame waitingPanel = new JFrame();
-                    waitingPanel.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                    waitingPanel.setSize(500,250);
-                    waitingPanel.setLocation(btn.getX(),btn.getY());
-                    waitingPanel.getRootPane().setWindowDecorationStyle(JRootPane.NONE);
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo, fileName,waitingPanel, VideoMaskFrame.this);
+                    WaitingPanelFrame waitingFrame= new WaitingPanelFrame(VideoMaskFrame.this);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo, fileName,waitingFrame);
                     videoMask.startUnmasking();
                 } catch (IOException | InterruptedException ioException) {
                     ioException.printStackTrace();

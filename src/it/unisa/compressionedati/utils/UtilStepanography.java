@@ -117,7 +117,7 @@ public class UtilStepanography {
 
             if (i == 0) {
                 freeSpaceInCarrier -= encode(getBytes(payloadSize), 4, 0);
-
+String out1="";
                 //freeSpaceInCarrier -= encode(getBytes(fnameLen), 4, 0);
 
                 //freeSpaceInCarrier -= encode(sectretFname.getBytes(), sectretFname.getBytes().length, 0);
