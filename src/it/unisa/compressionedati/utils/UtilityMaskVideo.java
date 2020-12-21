@@ -550,10 +550,18 @@ public class UtilityMaskVideo {
                 this.writer.release();
 
                 this.waitingPanel.writeOnConsole(("Inserimento traccia audio"));
-                String name_newaudio=this.execFFmpegWriteMetadataOnAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3","custom_mt_nframe",list.size()+"");
-                this.execFFmpegAddAudioTrack(name_newaudio,outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.avi");
 
 
+
+                this.execFFmpegConvertVideoToMp4Lossless(outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
+                File f = new File(outfile+File.separator+fileName+".avi");
+                f.delete();
+                this.execFFmpegAddAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_secure.mp4",outfile+File.separator+fileName+"_secure_withaudio.mp4");
+                f=new File(outfile+File.separator+fileName+"_secure.mp4");
+                f.delete();
+                this.execFFmpegWriteMetadataOnVideo(outfile+File.separator+fileName+"_secure_withaudio.mp4","album","nframe="+list.size()+"");
+                f=new File(outfile+File.separator+fileName+"_secure_withaudio.mp4");
+                f.delete();
                 if(in != null)
                     this.in.close();
                 if(coordsRoiFile != null)
@@ -570,11 +578,12 @@ public class UtilityMaskVideo {
                     File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
                     intermedieVideo.delete();
                     audioTrack.delete();
+
                     this.waitingPanel.getParent().setVisible(true);
                     waitingPanel.dispatchEvent(new WindowEvent(waitingPanel, WindowEvent.WINDOW_CLOSING));
                 }
                 else{
-                    this.execFFmpegWriteMetadataOnAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",outfile+File.separator+fileName+"_decompressed.mp4");
+                    this.execFFmpegWriteMetadataOnVideo(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",outfile+File.separator+fileName+"_decompressed.mp4");
                     File intermedieVideo = new File(outfile+File.separator+fileName+"_decompressed.avi");
                     File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
                     intermedieVideo.delete();
@@ -615,16 +624,16 @@ public class UtilityMaskVideo {
         }
     }
 
-    private String execFFmpegWriteMetadataOnAudioTrack(String path_trackaudio, String name_metadata, String metadata_value) throws IOException {
+    private String execFFmpegWriteMetadataOnVideo(String path_video, String name_metadata, String metadata_value) throws IOException {
         String args="";
         String os = System.getProperty("os.name").toLowerCase();
         if(os.contains("windows"))
             args="cmd /C start ";
         //ffmpeg -i a_secure.avi_trackAudio.mp3 -c copy -metadata customMeta="22" a_secure.avi_trackAudio.mp3
-        String name_audiotrack = path_trackaudio.replaceAll(".mp3","");
-        name_audiotrack+="_mt.mp3";
-        args += "ffmpeg -i "+path_trackaudio+" -c copy -metadata "+name_metadata+"="+metadata_value+" "+name_audiotrack+"";
-
+        String name_video = path_video.replaceAll(".mp4","");
+        name_video+="_mt.mp4";
+        args += "ffmpeg -i "+path_video+" -metadata "+name_metadata+"="+metadata_value+" -codec copy "+name_video+"";
+        //-metadata album="nframe=22" -codec copy output.avi
         System.out.print(args);
         String dir =System.getProperty("user.dir")+"/resources/ffmpeg/";
         Process p = Runtime.getRuntime().exec(args,null, new File(dir));
@@ -648,7 +657,7 @@ public class UtilityMaskVideo {
             System.out.println(s);
         }
 
-        return name_audiotrack;
+        return name_video;
     }
 
     private void unzipFile(String source, String target) throws IOException {
@@ -691,6 +700,42 @@ public class UtilityMaskVideo {
 
     }
 
+
+    public boolean execFFmpegConvertVideoToMp4Lossless(String video_input, String video_out) throws IOException, InterruptedException
+    {
+
+        String args="";
+        String os = System.getProperty("os.name").toLowerCase();
+        if(os.contains("windows"))
+            args="cmd /C start ";
+        args += "ffmpeg -i "+video_input+" -vcodec png "+video_out;
+
+        System.out.print(args);
+        String dir =System.getProperty("user.dir")+"/resources/ffmpeg/";
+        Process p = Runtime.getRuntime().exec(args,null, new File(dir));
+
+        BufferedReader stdInput = new BufferedReader(new
+                InputStreamReader(p.getInputStream()));
+
+        BufferedReader stdError = new BufferedReader(new
+                InputStreamReader(p.getErrorStream()));
+
+        // Read the output from the command
+        System.out.println("Here is the standard output of the command:\n");
+        String s = null;
+        while ((s = stdInput.readLine()) != null) {
+            System.out.println(s);
+        }
+
+        // Read any errors from the attempted command
+        System.out.println("Here is the standard error of the command (if any):\n");
+        while ((s = stdError.readLine()) != null) {
+            System.out.println(s);
+        }
+
+        return true;
+
+    }
 
     public boolean execFFmpegAddAudioTrack( String audio_input, String video_input, String video_out) throws IOException, InterruptedException
     {
