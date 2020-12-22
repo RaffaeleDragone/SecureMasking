@@ -81,9 +81,12 @@ public class VideoMaskFrame extends JFrame {
         classifier.add("Haar Eye");
         JComboBox cmbClassifier = new JComboBox(classifier.toArray());
 
-        TextField text = new TextField();
-        text.setText("password");
-        text.setBackground(Color.WHITE);
+        ArrayList<String> encryption = populateEncrypt();
+        JComboBox cmbEnc = new JComboBox(encryption.toArray());
+
+        TextField textPassword = new TextField();
+        textPassword.setText("password");
+        textPassword.setBackground(Color.WHITE);
         JButton btn = new JButton("Compress");
 
         class clickButton implements ActionListener {
@@ -93,11 +96,12 @@ public class VideoMaskFrame extends JFrame {
                 String PATH_OUT = PATH_DATA+File.separator+"video"+File.separator+"out";
                 String classifierType= cmbClassifier.getSelectedItem().toString();
                 String fileName= (combo.getSelectedItem().toString()).replace(".mp4","");
-
+                String encryption = cmbEnc.getSelectedItem().toString();
+                String pass = textPassword.getText();
                 try {
                     semaforo.acquire();
                     WaitingPanelFrame waitingFrame= new WaitingPanelFrame(VideoMaskFrame.this);
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType, fileName,waitingFrame);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video,PATH_OUT,mask, semaforo,classifierType, fileName,waitingFrame,pass,encryption);
                     videoMask.startMasking();
 
                 } catch (IOException | InterruptedException ioException) {
@@ -115,11 +119,23 @@ public class VideoMaskFrame extends JFrame {
         panel.add(cmbMask);
         panel.add(new JLabel("Tipo di Riconoscimento"));
         panel.add(cmbClassifier);
-        panel.add(text);
+        panel.add(new JLabel("Encryption type"));
+        panel.add(cmbEnc);
+        panel.add(textPassword);
         panel.add(btn);
         panel.setBorder(new TitledBorder(new EtchedBorder(), "Compression"));
 
         return panel;
+    }
+
+    private ArrayList<String> populateEncrypt() {
+        ArrayList<String> e = new ArrayList<>();
+        e.add("ECB");
+        e.add("CBC");
+        e.add("CFB");
+        e.add("OFB");
+        return e;
+
     }
 
     public JPanel createDecompressionPanel(){

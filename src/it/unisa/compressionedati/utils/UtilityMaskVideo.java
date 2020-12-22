@@ -69,8 +69,9 @@ public class UtilityMaskVideo {
     private String out;
     private ArrayList<byte[]> listFrame;
     private int temp=0;
+    private String Encrypt,password;
 
-    public  UtilityMaskVideo(String _in_video, String _out_video, String mask, Semaphore semaphore, String classifierType, String fileName, WaitingPanelFrame waitingFrame) throws IOException {
+    public  UtilityMaskVideo(String _in_video, String _out_video, String mask, Semaphore semaphore, String classifierType, String fileName, WaitingPanelFrame waitingFrame, String password,String encryptionType) throws IOException {
         this.classifierType=classifierType;
         FileUtils.cleanDirectory(new File(_out_video));
         this.faceCascade = new CascadeClassifier();
@@ -83,7 +84,8 @@ public class UtilityMaskVideo {
                 this.eyeClassifier.load("resources/haarcascades/haarcascade_eye.xml");
             }
         this.capture = new VideoCapture(_in_video);
-
+        this.Encrypt = encryptionType;
+        this.password= password;
         this.absoluteFaceSize = 0;
         this.absoluteEyeSize = 0;
         this.currFrame=0;
@@ -518,11 +520,12 @@ public class UtilityMaskVideo {
                 this.waitingPanel.writeOnConsole(("Start: Stenografia "+"\n"));
 
 
-                char[] password = new char[] {'p','a','s','s','w','o','r','d'};
+                char[] password = this.password.toCharArray();
                 UtilStepanography steno= new UtilStepanography();
                 steno.setCompression(true);
                 steno.setEncryption(true);
-                steno.setEncryptionMode("CBC");
+                steno.setEncryptionMode(Encrypt);
+                System.out.println("Password => "+password);
                 int i=0;
                 ArrayList<byte[]> list =steno.hide(listFrame,out,password);
 
