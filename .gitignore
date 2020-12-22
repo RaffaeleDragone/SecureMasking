@@ -1,3 +1,21 @@
 # Project exclude paths
 /target/
 .idea/
+
+resources/ffmpeg/doc/
+
+resources/ffmpeg/
+
+SecureMasking.iml
+
+libs/
+
+*.log
+
+data/video/out/dataFrame.txt
+
+dataset/readme.txt
+
+data/results/results.txt
+
+data/file/secret.txt

@@ -147,10 +147,13 @@ public class VideoMaskFrame extends JFrame {
         strs.sort(String::compareToIgnoreCase);
         JComboBox combo = new JComboBox(strs.toArray());
 
-        TextField text = new TextField();
-        text.setText("password");
-        text.setBackground(Color.WHITE);
+        TextField textPassword = new TextField();
+        textPassword.setText("password");
+        textPassword.setBackground(Color.WHITE);
         JButton btn = new JButton("Decompress");
+
+        ArrayList<String> encryption = populateEncrypt();
+        JComboBox cmbEnc = new JComboBox(encryption.toArray());
 
         class clickButton implements ActionListener {
             public void actionPerformed(ActionEvent e) {
@@ -158,10 +161,12 @@ public class VideoMaskFrame extends JFrame {
                 String path_dataFrame = PATH_DATA +File.separator+ "video"+File.separator+"out";
                 String PATH_OUT = PATH_DATA+File.separator+"video"+File.separator+"out";
                 String fileName= (combo.getSelectedItem().toString()).replace(".mp4","");
+                String encryption = cmbEnc.getSelectedItem().toString();
+                String pass = textPassword.getText();
                 try {
                     semaforo.acquire();
                     WaitingPanelFrame waitingFrame= new WaitingPanelFrame(VideoMaskFrame.this);
-                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo, fileName,waitingFrame);
+                    UtilityMaskVideo videoMask = new UtilityMaskVideo(video, PATH_OUT, path_dataFrame, semaforo, fileName, waitingFrame, pass, encryption);
                     videoMask.startUnmasking();
                 } catch (IOException | InterruptedException ioException) {
                     ioException.printStackTrace();
@@ -174,7 +179,9 @@ public class VideoMaskFrame extends JFrame {
 
         panel.add(new JLabel("Video Input"));
         panel.add(combo);
-        panel.add(text);
+        panel.add(new JLabel("Encryption type"));
+        panel.add(cmbEnc);
+        panel.add(textPassword);
         panel.add(btn);
         panel.setBorder(new TitledBorder(new EtchedBorder(), "Decompression"));
 

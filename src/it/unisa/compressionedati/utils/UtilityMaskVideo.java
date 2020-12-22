@@ -26,7 +26,6 @@ import javax.swing.*;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.*;
-import java.lang.reflect.Array;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -43,7 +42,6 @@ import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 //import static com.sun.xml.internal.ws.spi.db.BindingContextFactory.LOGGER;
-
 
 public class UtilityMaskVideo {
     private ScheduledExecutorService timer;
@@ -101,23 +99,94 @@ public class UtilityMaskVideo {
         this.out="";
     }
 
-    public  UtilityMaskVideo(String _in_video, String _out_video, String pathDataFrame, Semaphore semaphore, String fileName, WaitingPanelFrame waitingFrame) throws IOException {
+    public UtilityMaskVideo(String _in_video, String _out_video, String pathDataFrame, Semaphore semaphore, String fileName, WaitingPanelFrame waitingFrame, String password, String encryptionType) throws IOException {
         this.capture = new VideoCapture(_in_video);
+
+        this.Encrypt = encryptionType;
+        this.password = password;
+        this.currFrame=0;
+
         this.writer= new VideoWriter();
         this.outfile = _out_video;
         this.waitingPanel= waitingFrame;
-        this.unzipFile(pathDataFrame+"/dataFrame.zip",pathDataFrame+"/dataFrame.txt");
-        dataFrameIn = new File(pathDataFrame+"/dataFrame.txt");
-        in = new Scanner(dataFrameIn);
+        //this.unzipFile(pathDataFrame+"/dataFrame.zip",pathDataFrame+"/dataFrame.txt");
+        //dataFrameIn = new File(pathDataFrame+"/dataFrame.txt");
+        //in = new Scanner(dataFrameIn);
         this.semaforo=semaphore;
         this.video_in=_in_video;
         this.fileName= fileName;
+        this.listFrame = new ArrayList<>();
+
+        this.waitingPanel.getParent().setVisible(false);
+        this.waitingPanel.setVisible(true);
+        this.waitingPanel.writeOnConsole(("Start: De-stenografia "+"\n"));
+        UtilStepanography steno= new UtilStepanography();
+        steno.setCompression(true);
+        steno.setEncryption(true);
+        steno.setEncryptionMode(Encrypt);
+
+        String stenoInput = new String();
+
+        try {
+            stenoInput = steno.reveal(getImgBytesSteno(), this.password.toCharArray());
+            in = new Scanner(stenoInput);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchProviderException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (ShortBufferException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidAlgorithmParameterException e) {
+            e.printStackTrace();
+        }
     }
 
+    private ArrayList<byte[]> getImgBytesSteno() throws IOException {
+
+        ArrayList<byte[]> listSteno = new ArrayList<>();
+
+        String n_frame = execFFprobeExtractMetadata(video_in, "album");
+        //System.out.println(n_frame.substring(n_frame.lastIndexOf("=")+1, n_frame.length()));
+        int nFrameSteno = Integer.parseInt(n_frame.substring(n_frame.lastIndexOf("=")+1, n_frame.length()));
+
+        VideoCapture stenoCapture = new VideoCapture(video_in);
+        for(int i=0; i<nFrameSteno; ++i){
+            Mat frame = new Mat();
+            // check if the capture is open
+            if (stenoCapture.isOpened())
+            {
+                try
+                {
+                    // read the current frame and save in 'frame'
+                    stenoCapture.read(frame);
+                }
+                catch (Exception e)
+                {
+                    // log the (full) error
+                    System.err.println("Exception while collecting stepanographed frames: " + e);
+                    e.printStackTrace();
+                }
+            }
+            MatOfByte mob=new MatOfByte();
+            Imgcodecs.imencode(".png", frame, mob);
+            byte ba[]=mob.toArray();
+            listSteno.add(ba);
+        }
+        stenoCapture.release();
+        this.waitingPanel.writeOnConsole(("END: De-stenografia "+"\n"));
+        return listSteno;
+    }
 
     public void startMasking()
     {
-
         this.waitingPanel.getParent().setVisible(false);
         this.waitingPanel.setVisible(true);
         this.waitingPanel.writeOnConsole(("Inizializzazione Parametri Masking\n"));
@@ -129,7 +198,6 @@ public class UtilityMaskVideo {
 
         //this.writer.open(outfile+File.separator+fileName+".avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
         this.writer.open(outfile+File.separator+fileName+".avi", VideoWriter.fourcc('H', 'F','Y','U'),fps, frameSize, true);
-
 
         // grab a frame every 33 ms (30 frames/sec)
         Runnable frameGrabber = new Runnable() {
@@ -148,16 +216,17 @@ public class UtilityMaskVideo {
 
         this.timer = Executors.newSingleThreadScheduledExecutor();
         this.timer.scheduleAtFixedRate(frameGrabber, 0, fps, TimeUnit.MILLISECONDS);
-
-
     }
 
     public void startUnmasking()
     {
+        this.waitingPanel.writeOnConsole(("Inizializzazione Parametri Unmasking\n"));
         Size frameSize = new Size((int) this.capture.get(Videoio.CAP_PROP_FRAME_WIDTH), (int) this.capture.get(Videoio.CAP_PROP_FRAME_HEIGHT));
+        this.totalFrame= (int) this.capture.get(Videoio.CAP_PROP_FRAME_COUNT);
+        this.waitingPanel.writeOnConsole(("Numero di Frame: "+this.totalFrame+"\n"));
         int fps = (int) this.capture.get(Videoio.CAP_PROP_FPS);
-        this.writer.open(outfile+File.separator+fileName+"_decompressed.avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
 
+        this.writer.open(outfile+File.separator+fileName+"_decompressed.avi", VideoWriter.fourcc('x', '2','6','4'),fps, frameSize, true);
 
         // grab a frame every 33 ms (30 frames/sec)
         Runnable frameGrabber = new Runnable() {
@@ -171,7 +240,7 @@ public class UtilityMaskVideo {
                 //Image imageToShow = Utils.mat2Image(frame);
                 //updateImageView(originalFrame, imageToShow);
 
-                writer.write(frame);
+                //writer.write(frame);
             }
         };
 
@@ -211,7 +280,6 @@ public class UtilityMaskVideo {
                             this.detectAndDisplayAndUnmask(frame);
                 }else{
                     this.waitingPanel.writeOnConsole(("Estrazione Traccia Audio"+"\n"));
-
                     this.extractAudioTrack(video_in,outfile+File.separator+fileName+"_trackAudio.mp3");
                     stopAcquisition(isMasking);
                     System.out.println("FINE");
@@ -263,7 +331,6 @@ public class UtilityMaskVideo {
         Mat matrixImgInCopy = frame;
         String mask = maskPath;
 
-
         String out1="";
         int i = 1;
         for (Rect rect : faces.toArray()) {
@@ -277,7 +344,8 @@ public class UtilityMaskVideo {
             coords = i + "," + rect.x + "," + rect.y + "-";
             out1+= "coord= "+coords+" ";
             //Imgcodecs.imwrite("/Users/raffaeledragone/Sviluppo/UnisaWs/CompressioneDati/SecureMasking/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
-            Imgcodecs.imwrite("/home/alfonso/UNISA/CompressioneDati/SecureMaskingGit/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
+            //Imgcodecs.imwrite("/home/alfonso/UNISA/CompressioneDati/SecureMaskingGit/data/imgs/out/roi/" + i + ".jpg", matrixImgROI);
+            Imgcodecs.imwrite("/home/dangerous/Scrivania/CD/SecureMasking/data/imgs/out/roi" + i + ".jpg", matrixImgROI);
 
             MatOfByte mob=new MatOfByte();
             Imgcodecs.imencode(".jpg", matrixImgROI, mob);
@@ -303,8 +371,6 @@ public class UtilityMaskVideo {
         byte ba[]=mob.toArray();
         listFrame.add(ba);
 
-
-
         if(out1!= "") {
             coordsRoiFile.append(out1 + "\n"); //foreach frame
             out+=out1+"\n";
@@ -316,10 +382,7 @@ public class UtilityMaskVideo {
         ++currFrame;
     }
 
-
-
-
-    private void detectAndDisplayAndMaskEye(Mat frame) throws IOException {
+    /*private void detectAndDisplayAndMaskEye(Mat frame) throws IOException {
 
         this.waitingPanel.writeOnConsole(("Rilevamento tratti e Masking frame "+currFrame+"/"+this.totalFrame+"\n"));
 
@@ -384,8 +447,6 @@ public class UtilityMaskVideo {
                 out1+="value= "+value+" ";
             }
 
-
-
             if(out1!= "") {
                 coordsRoiFile.append(out1 + "\n"); //foreach frame
                 out+=out1+"\n";
@@ -394,8 +455,6 @@ public class UtilityMaskVideo {
                 coordsRoiFile.append("/\n"); //foreach frame
                 out+="/\n";
             }
-
-
         }
         MatOfByte mob=new MatOfByte();
         Imgcodecs.imencode(".png", frame, mob);
@@ -403,10 +462,88 @@ public class UtilityMaskVideo {
         listFrame.add(ba);
 
         ++currFrame;
+    }*/
 
+    private void detectAndDisplayAndMaskEye(Mat frame) throws IOException {
+
+        this.waitingPanel.writeOnConsole(("Rilevamento tratti e Masking frame "+currFrame+"/"+this.totalFrame+"\n"));
+
+        MatOfRect faces = new MatOfRect();
+        Mat grayFrame = new Mat();
+
+        // convert the frame in gray scale
+        Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_BGR2GRAY);
+        // equalize the frame histogram to improve the result
+        Imgproc.equalizeHist(grayFrame, grayFrame);
+
+        // compute minimum face size (20% of the frame height, in our case)
+        if (this.absoluteFaceSize == 0)
+        {
+            int height = grayFrame.rows();
+            if (Math.round(height * 0.1f) > 0)
+            {
+                this.absoluteFaceSize = Math.round(height * 0.1f);
+            }
+        }
+
+        // detect faces
+        this.faceCascade.detectMultiScale(grayFrame, faces, 1.1, 2, 0 | Objdetect.CASCADE_SCALE_IMAGE,
+                new Size(this.absoluteFaceSize, this.absoluteFaceSize), new Size());
+
+        // each rectangle in faces is a face: draw them!
+        Rect[] facesArray = faces.toArray();
+        Mat matrixImgIn = frame;
+        // Copia dell'immagine di partenza per sottrarre le ROI in modo tale che non vengano sovrascritte dopo aver applicato la maschera
+        Mat matrixImgInCopy = frame;
+        String mask = maskPath;
+
+        String out1="";
+        int i = 1;
+        for (Rect rect : faces.toArray()) {
+            Rect roi = new Rect(rect.x, rect.y, rect.width, rect.height);
+            Mat matrixImgROI = matrixImgInCopy.submat(roi);
+            MatOfRect eyes = new MatOfRect();
+            Mat grayFrameEye = new Mat();
+            Imgproc.cvtColor(matrixImgROI, grayFrameEye, Imgproc.COLOR_BGR2GRAY);
+            // equalize the frame histogram to improve the result
+            Imgproc.equalizeHist(grayFrameEye, grayFrameEye);
+            this.eyeClassifier.detectMultiScale(grayFrameEye,eyes,1.1,5);
+            for(Rect eye: eyes.toArray()){
+                String coords = "";
+                File f=new File(mask);
+                Mat matrixMask = Imgcodecs.imread(mask);
+                Mat matrixMaskResized = new Mat();
+                Imgproc.resize(matrixMask, matrixMaskResized, new Size(eye.width, eye.height));
+                Mat matrixImgSecure = matrixImgROI.submat(new Rect(eye.x, eye.y, matrixMaskResized.cols(), matrixMaskResized.rows()));
+                matrixMaskResized.copyTo(matrixImgSecure);
+                coords = i + "," + eye.x + "," + eye.y + "-";
+                out1+= "coord= "+coords+" ";
+
+                MatOfByte mob=new MatOfByte();
+                Imgcodecs.imencode(".jpg", matrixImgROI, mob);
+                byte ba[]=mob.toArray();
+
+                String value = Base64.getEncoder().encodeToString(ba);
+                out1+="value= "+value+" ";
+
+                i++;
+            }
+        }
+        MatOfByte mob=new MatOfByte();
+        Imgcodecs.imencode(".png", frame, mob);
+        byte ba[]=mob.toArray();
+        listFrame.add(ba);
+
+        if(out1!= "") {
+            coordsRoiFile.append(out1 + "\n"); //foreach frame
+            out+=out1+"\n";
+        }
+        else{
+            coordsRoiFile.append("/\n"); //foreach frame
+            out+="/\n";
+        }
+        ++currFrame;
     }
-
-
 
     private void extractAudioTrack(String _input, String _output){
 
@@ -450,13 +587,13 @@ public class UtilityMaskVideo {
             //LOGGER.err("", e);
         }
 
-
     }
 
-
     private void detectAndDisplayAndUnmask(Mat frame) throws IOException {
+
+        this.waitingPanel.writeOnConsole(("Unmasking frame "+currFrame+"/"+this.totalFrame+"\n"));
         //for each frame
-        if(temp<30){
+        /*if(temp<30){
             MatOfByte mob=new MatOfByte();
             Imgcodecs.imencode(".png", frame, mob);
             byte ba[]=mob.toArray();
@@ -464,46 +601,52 @@ public class UtilityMaskVideo {
                 BufferedImage image = ImageIO.read(bais);
                 new PngEncoder()
                         .withBufferedImage(image)
-                        .toFile(new File("/Users/raffaeledragone/Sviluppo/UnisaWs/Compressione Dati/LocalStego/outputstegano/"+temp+".png"));
+                        .toFile(new File("/home/dangerous/LocalStego/outputstegano/"+temp+".png"));
                 ++temp;
 
-        }
+        }*/
         ArrayList<Roi> rois = new ArrayList<>();
         Mat matrixImgIn = frame;
 
         if(in.hasNextLine()){
             String line = in.nextLine();    //leggo una riga corrispondente a un frame
             String[] parts = line.split("\\s+");    //splitto la riga in parti separate da whitespaces
-            if(parts[0].equals("/"))
-                return;
-            for(int i=0; i<parts.length; i++) {
-                int x = 0;
-                int y = 0;
-                String value = null;
-                if(parts[i].equals("coord=")){
-                    String[] coord = parts[++i].substring(0, parts[i].lastIndexOf("-")).split("[,]");
-                    x = Integer.parseInt(coord[1]);
-                    y = Integer.parseInt(coord[2]);
+            if(!parts[0].equals("/")){
+                for(int i=0; i<parts.length; i++) {
+                    int x = 0;
+                    int y = 0;
+                    String value = null;
+                    if(parts[i].equals("coord=")){
+                        String[] coord = parts[++i].substring(0, parts[i].lastIndexOf("-")).split("[,]");
+                        x = Integer.parseInt(coord[1]);
+                        y = Integer.parseInt(coord[2]);
+                    }
+                    if(parts[++i].equals("value=")){
+                        value = parts[++i];
+                    }
+                    Roi r = new Roi(x, y, value);
+                    rois.add(r);
+                    //System.out.println("x: " + x + ", y: " + y + ", value : " + value);
                 }
-                if(parts[++i].equals("value=")){
-                    value = parts[++i];
-                }
-                Roi r = new Roi(x, y, value);
-                rois.add(r);
-                //System.out.println("x: " + x + ", y: " + y + ", value : " + value);
-            }
-            for(Roi r : rois){
-                String value = r.getValue();
-                //byte[] ba = null;
-                //Base64.getDecoder().decode(ba);
-                byte[] ba = Base64.getDecoder().decode(value);
-                Mat mat = Imgcodecs.imdecode(new MatOfByte(ba),Imgcodecs.IMREAD_UNCHANGED); //immagine della roi
-                Rect roi = new Rect(r.getX(), r.getY(), mat.cols(), mat.rows());    //coordinate della roi
+                for(Roi r : rois){
+                    String value = r.getValue();
+                    //byte[] ba = null;
+                    //Base64.getDecoder().decode(ba);
+                    byte[] ba = Base64.getDecoder().decode(value);
+                    Mat mat = Imgcodecs.imdecode(new MatOfByte(ba),Imgcodecs.IMREAD_UNCHANGED); //immagine della roi
+                    Rect roi = new Rect(r.getX(), r.getY(), mat.cols(), mat.rows());    //coordinate della roi
 
-                Mat matrixImg = matrixImgIn.submat(new Rect(roi.x, roi.y, roi.width, roi.height));
-                mat.copyTo(matrixImg);
+                    Mat matrixImg = matrixImgIn.submat(new Rect(roi.x, roi.y, roi.width, roi.height));
+                    mat.copyTo(matrixImg);
+                }
             }
         }
+
+        MatOfByte mob=new MatOfByte();
+        Imgcodecs.imencode(".png", frame, mob);
+        byte ba[]=mob.toArray();
+        listFrame.add(ba);
+        ++currFrame;
     }
 
     private void stopAcquisition(boolean isMasking)
@@ -517,61 +660,63 @@ public class UtilityMaskVideo {
                 this.timer.shutdown();
                 this.timer.awaitTermination(33, TimeUnit.MILLISECONDS);
 
-                this.waitingPanel.writeOnConsole(("Start: Stenografia "+"\n"));
+                if (isMasking){
+                    this.waitingPanel.writeOnConsole(("Start: Stenografia "+"\n"));
+
+                    char[] password = this.password.toCharArray();
+                    UtilStepanography steno= new UtilStepanography();
+                    steno.setCompression(true);
+                    steno.setEncryption(true);
+                    steno.setEncryptionMode(Encrypt);
+                    System.out.println("Password => "+password);
+                    int i=0;
+                    ArrayList<byte[]> list =steno.hide(listFrame,out,password);
+
+                    this.waitingPanel.writeOnConsole(("END: Stenografia "+"\n"+"Frame Utilizzati per stenografare: "+list.size()));
 
 
-                char[] password = this.password.toCharArray();
-                UtilStepanography steno= new UtilStepanography();
-                steno.setCompression(true);
-                steno.setEncryption(true);
-                steno.setEncryptionMode(Encrypt);
-                System.out.println("Password => "+password);
-                int i=0;
-                ArrayList<byte[]> list =steno.hide(listFrame,out,password);
+                    for(i=0; i<list.size();++i){
 
-                this.waitingPanel.writeOnConsole(("END: Stenografia "+"\n"+"Frame Utilizzati per stenografare: "+list.size()));
+                        this.waitingPanel.writeOnConsole(("Scrittura frame stenografato: "+i+"/"+list.size()));
 
+                        Mat mat = Imgcodecs.imdecode(new MatOfByte(list.get(i)),Imgcodecs.IMREAD_UNCHANGED);
+                        writer.write(mat);
 
-                for(i=0; i<list.size();++i){
-
-                    this.waitingPanel.writeOnConsole(("Scrittura frame stenografato: "+i+"/"+list.size()));
-
-                    Mat mat = Imgcodecs.imdecode(new MatOfByte(list.get(i)),Imgcodecs.IMREAD_UNCHANGED);
-                    writer.write(mat);
-
-                }
-                System.out.println("Lista => "+list.size());
-                for(; i<listFrame.size();++i){
-                    this.waitingPanel.writeOnConsole(("Scrittura frame standard: "+i+"/"+totalFrame));
+                    }
+                    System.out.println("Lista => "+list.size());
+                    for(; i<listFrame.size();++i){
+                        this.waitingPanel.writeOnConsole(("Scrittura frame standard: "+i+"/"+totalFrame));
 
 
-                    Mat mat = Imgcodecs.imdecode(new MatOfByte(listFrame.get(i)),Imgcodecs.IMREAD_UNCHANGED);
-                    writer.write(mat);
+                        Mat mat = Imgcodecs.imdecode(new MatOfByte(listFrame.get(i)),Imgcodecs.IMREAD_UNCHANGED);
+                        writer.write(mat);
+                        System.gc();    //chiamo garbage per eliminare a ogni write il Mat contenente il frame dalla memoria
+                    }
 
-                }
+                    int n_frame = list.size();
+                    list.clear();
+                    listFrame.clear();
+                    this.writer.release();
+                    System.out.println("Chiamo garbage collector");
+                    System.gc();
 
-                this.writer.release();
+                    this.waitingPanel.writeOnConsole(("Inserimento traccia audio"));
 
-                this.waitingPanel.writeOnConsole(("Inserimento traccia audio"));
+                    this.execFFmpegConvertVideoToMp4Lossless(outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
+                    File f = new File(outfile+File.separator+fileName+".avi");
+                    f.delete();
+                    this.execFFmpegAddAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_secure.mp4",outfile+File.separator+fileName+"_secure_withaudio.mp4");
+                    f=new File(outfile+File.separator+fileName+"_secure.mp4");
+                    f.delete();
+                    this.execFFmpegWriteMetadataOnVideo(outfile+File.separator+fileName+"_secure_withaudio.mp4","album","nframe="+n_frame+"");
+                    f=new File(outfile+File.separator+fileName+"_secure_withaudio.mp4");
+                    f.delete();
 
+                    if(coordsRoiFile != null)
+                        this.coordsRoiFile.close();
+                    this.zipFile(this.outfile+"/dataFrame.txt",this.outfile+"/dataFrame.zip");
+                    this.capture.release();
 
-
-                this.execFFmpegConvertVideoToMp4Lossless(outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.mp4");
-                File f = new File(outfile+File.separator+fileName+".avi");
-                f.delete();
-                this.execFFmpegAddAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_secure.mp4",outfile+File.separator+fileName+"_secure_withaudio.mp4");
-                f=new File(outfile+File.separator+fileName+"_secure.mp4");
-                f.delete();
-                this.execFFmpegWriteMetadataOnVideo(outfile+File.separator+fileName+"_secure_withaudio.mp4","album","nframe="+list.size()+"");
-                f=new File(outfile+File.separator+fileName+"_secure_withaudio.mp4");
-                f.delete();
-                if(in != null)
-                    this.in.close();
-                if(coordsRoiFile != null)
-                    this.coordsRoiFile.close();
-                this.zipFile(this.outfile+"/dataFrame.txt",this.outfile+"/dataFrame.zip");
-                this.capture.release();
-                if(isMasking){
                     this.waitingPanel.writeOnConsole(("Ricostruzione video con traccia Audio"));
 
                     //this.execJavaScript(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+".avi",outfile+File.separator+fileName+"_secure.avi");
@@ -586,11 +731,39 @@ public class UtilityMaskVideo {
                     waitingPanel.dispatchEvent(new WindowEvent(waitingPanel, WindowEvent.WINDOW_CLOSING));
                 }
                 else{
-                    this.execFFmpegWriteMetadataOnVideo(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",outfile+File.separator+fileName+"_decompressed.mp4");
-                    File intermedieVideo = new File(outfile+File.separator+fileName+"_decompressed.avi");
+                    String video_out = outfile+File.separator+fileName;
+                    String name_video = video_out.replaceAll("_secure_withaudio_mt.mp4","");
+                    //remove old video output
+                    File f = new File(name_video+"_decompressed.mp4");
+                    f.delete();
+
+                    for(int i=0; i<listFrame.size();++i){
+                        this.waitingPanel.writeOnConsole(("Scrittura frame: "+i+"/"+totalFrame));
+                        Mat mat = Imgcodecs.imdecode(new MatOfByte(listFrame.get(i)),Imgcodecs.IMREAD_UNCHANGED);
+                        writer.write(mat);
+                        System.gc();    //chiamo garbage per eliminare a ogni write il Mat contenente il frame dalla memoria
+                    }
+
+                    listFrame.clear();
+                    this.writer.release();
+                    System.out.println("Chiamo garbage collector");
+                    System.gc();
+
+                    this.waitingPanel.writeOnConsole(("Inserimento traccia audio"));
+                    this.execFFmpegAddAudioTrack(outfile+File.separator+fileName+"_trackAudio.mp3",outfile+File.separator+fileName+"_decompressed.avi",name_video+"_decompressed.mp4");
+
+                    this.waitingPanel.writeOnConsole(("Eliminazione file intermedi"+"\n"));
+                    f = new File(outfile+File.separator+fileName+"_decompressed.avi");
+                    f.delete();
                     File audioTrack = new File(outfile+File.separator+fileName+"_trackAudio.mp3");
-                    intermedieVideo.delete();
                     audioTrack.delete();
+
+                    if(in != null)
+                        this.in.close();
+                    this.capture.release();
+
+                    this.waitingPanel.getParent().setVisible(true);
+                    waitingPanel.dispatchEvent(new WindowEvent(waitingPanel, WindowEvent.WINDOW_CLOSING));
                 }
             }
             catch (InterruptedException | IOException e)
@@ -614,11 +787,7 @@ public class UtilityMaskVideo {
             } catch (InvalidAlgorithmParameterException e) {
                 e.printStackTrace();
             }
-
-
         }
-
-
 
         if (this.capture.isOpened())
         {
@@ -663,6 +832,40 @@ public class UtilityMaskVideo {
         return name_video;
     }
 
+    private String execFFprobeExtractMetadata(String path_video, String name_metadata) throws IOException {
+        String args="";
+        String os = System.getProperty("os.name").toLowerCase();
+        if(os.contains("windows"))
+            args="cmd /C start ";
+        //ffprobe a_secure_withaudio_mt.mp4 -show_entries format_tags=album -of compact=p=0:nk=1 -v 0
+        args += "ffprobe "+path_video+" -show_entries format_tags="+name_metadata+" -of compact=p=0:nk=1 -v 0";
+        System.out.print(args);
+        String dir = System.getProperty("user.dir")+"/resources/ffmpeg/";
+        Process p = Runtime.getRuntime().exec(args,null, new File(dir));
+
+        BufferedReader stdInput = new BufferedReader(new
+                InputStreamReader(p.getInputStream()));
+
+        BufferedReader stdError = new BufferedReader(new
+                InputStreamReader(p.getErrorStream()));
+
+        String metadata = new String();
+        // Read the output from the command
+        System.out.println("\nHere is the standard output of the command:\n");
+        String s = null;
+        while ((s = stdInput.readLine()) != null) {
+            System.out.println(s);
+            metadata = s;
+        }
+        // Read any errors from the attempted command
+        System.out.println("Here is the standard error of the command (if any):\n");
+        while ((s = stdError.readLine()) != null) {
+            System.out.println(s);
+        }
+
+        return metadata;
+    }
+
     private void unzipFile(String source, String target) throws IOException {
         String fileZip = source;
         File destDir = new File(target);
@@ -702,7 +905,6 @@ public class UtilityMaskVideo {
         fos.close();
 
     }
-
 
     public boolean execFFmpegConvertVideoToMp4Lossless(String video_input, String video_out) throws IOException, InterruptedException
     {
@@ -775,6 +977,5 @@ public class UtilityMaskVideo {
         return true;
 
     }
-
 
 }
